@@ -16,6 +16,8 @@ attribute vec2 a_centroid_pos;
 varying vec2 v_pos_a;
 varying vec2 v_pos_b;
 varying vec4 v_lighting;
+varying float v_roof;
+varying vec4 v_color;
 
 #pragma mapbox: define lowp float base
 #pragma mapbox: define lowp float height
@@ -23,6 +25,7 @@ varying vec4 v_lighting;
 #pragma mapbox: define lowp vec4 pattern_to
 #pragma mapbox: define lowp float pixel_ratio_from
 #pragma mapbox: define lowp float pixel_ratio_to
+#pragma mapbox: define highp vec4 color
 
 void main() {
     #pragma mapbox: initialize lowp float base
@@ -31,6 +34,7 @@ void main() {
     #pragma mapbox: initialize mediump vec4 pattern_to
     #pragma mapbox: initialize lowp float pixel_ratio_from
     #pragma mapbox: initialize lowp float pixel_ratio_to
+    #pragma mapbox: initialize highp vec4 color
 
     vec2 pattern_tl_a = pattern_from.xy;
     vec2 pattern_br_a = pattern_from.zw;
@@ -41,6 +45,9 @@ void main() {
     float fromScale = u_scale.y;
     float toScale = u_scale.z;
 
+    // 假设一层楼的高度为3米，根据height计算楼房的层数
+    float floorCount = height <= 3.0 ? 1.0 : floor(height / 3.0);
+
     vec3 pos_nx = floor(a_pos_normal_ed.xyz * 0.5);
     // The least significant bits of a_pos_normal_ed.xy hold:
     // x is 1 if it's on top, 0 for ground.
@@ -50,6 +57,7 @@ void main() {
 
     float x_normal = pos_nx.z / 8192.0;
     vec3 normal = top_up_ny.y == 1.0 ? vec3(0.0, 0.0, 1.0) : normalize(vec3(x_normal, (2.0 * top_up_ny.z - 1.0) * (1.0 - abs(x_normal)), 0.0));
+    v_roof = normal.z;
     float edgedistance = a_pos_normal_ed.w;
 
     vec2 display_size_a = (pattern_br_a - pattern_tl_a) / pixel_ratio_from;
@@ -80,8 +88,13 @@ void main() {
         ? pos_nx.xy // extrusion top
         : vec2(edgedistance, z * u_height_factor); // extrusion side
 
-    v_pos_a = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, fromScale * display_size_a, tileRatio, pos);
-    v_pos_b = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, toScale * display_size_b, tileRatio, pos);
+    /* v_pos_a = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, fromScale * display_size_a, tileRatio, pos);
+    v_pos_b = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, toScale * display_size_b, tileRatio, pos); */
+
+    v_pos_a = vec2((edgedistance * floorCount) / (2.0 * height * u_height_factor), t > 0.0 ? -floorCount : 0.0);
+    v_pos_b = vec2((edgedistance * floorCount) / (2.0 * height * u_height_factor), t > 0.0 ? -floorCount : 0.0);
+
+    v_color = color;
 
     v_lighting = vec4(0.0, 0.0, 0.0, 1.0);
     float directional = clamp(dot(normal, u_lightpos), 0.0, 1.0);

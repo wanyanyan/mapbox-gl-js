@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox GL JS debug page</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel='stylesheet' href='../dist/mapbox-gl.css' />
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+
+<script src='../dist/mapbox-gl-dev.js'></script>
+<script src='../debug/access_token_generated.js'></script>
+<script>
+var map = window.map = new mapboxgl.Map({
+  container: 'map',
+  antialias: true,
+  zoom: 17,
+  center: [-79.390307, 43.658956],
+  bearing: 20,
+  pitch: 60,
+  style: 'mapbox://styles/mapbox/light-v9',
+  hash: false
+});
+
+map.on('load', function() {
+  let images = ['dgqtb91147', 'dgjzb03472', 'dgjzb03351']
+  //map.showTileBoundaries = true
+  images.forEach(img => {
+    map.loadImage(`./textures/${img}.jpg`, function (error, image) {
+      if (error) throw error;
+      if (!map.hasImage(img)) {
+        map.addImage(img, image);
+      }
+      else {
+        console.log("未加载图片");
+      }
+    });
+  })
+  map.addLayer({
+    'id': '3d-buildings',
+    'source': 'composite',
+    'source-layer': 'building',
+    'filter': ['==', 'extrude', 'true'],
+    'type': 'fill-extrusion',
+    'minzoom': 15,
+    'paint': {
+      'fill-extrusion-color': '#ccc',
+      'fill-extrusion-height': ["get", "height"],
+      "fill-extrusion-pattern": {
+        "base": 1,
+        "type": "interval",
+        "property": "height",
+        "stops": [
+          [20, "dgqtb91147"],
+          [50, "dgjzb03472"],
+          [80, "dgjzb03351"]
+        ],
+        "default": "dgqtb91147"
+      }
+    }
+  });
+});
+</script>
+</body>
+</html>

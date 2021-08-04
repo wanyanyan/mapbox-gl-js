@@ -6,6 +6,8 @@ uniform sampler2D u_image;
 varying vec2 v_pos_a;
 varying vec2 v_pos_b;
 varying vec4 v_lighting;
+varying float v_roof;
+varying vec4 v_color;
 
 #pragma mapbox: define lowp float base
 #pragma mapbox: define lowp float height
@@ -35,7 +37,7 @@ void main() {
     vec2 pos2 = mix(pattern_tl_b / u_texsize, pattern_br_b / u_texsize, imagecoord_b);
     vec4 color2 = texture2D(u_image, pos2);
 
-    vec4 out_color = mix(color1, color2, u_fade);
+    vec4 out_color = v_roof > 0.0 ? v_color : mix(color1, color2, u_fade);
 
     out_color = out_color * v_lighting;
 
