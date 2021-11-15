@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox GL JS debug page</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel='stylesheet' href='../dist/mapbox-gl.css' />
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+
+<script src='../dist/mapbox-gl-dev.js'></script>
+<script src='../debug/access_token_generated.js'></script>
+<script>
+var map = window.map = new mapboxgl.Map({
+  container: 'map',
+  antialias: true,
+  zoom: 15.44,
+  center: [114.393766, 30.511523],
+  bearing: 0,
+  pitch: 50,
+  style: './styles/style.json',
+  hash: true
+});
+
+map.on('load', function() {
+  let images = ['停车场', "道路", "草地", "道路2", "道路3", "人行道", "水面"]
+  //map.showTileBoundaries = true
+  images.forEach(img => {
+    map.loadImage(`./textures/${img}.png`, function (error, image) {
+      if (error) throw error;
+      if (!map.hasImage(img)) {
+        map.addImage(img, image);
+      }
+      else {
+        console.log("未加载图片");
+      }
+    });
+  })
+});
+</script>
+</body>
+</html>

@@ -93,6 +93,7 @@ import geojson from '../source/geojson_source.js';
 import video from '../source/video_source.js';
 import image from '../source/image_source.js';
 import canvas from '../source/canvas_source.js';
+import model from '../source/model_tile_source.js';
 
 import type {SourceSpecification} from '../style-spec/types.js';
 
@@ -103,7 +104,8 @@ const sourceTypes = {
     geojson,
     video,
     image,
-    canvas
+    canvas,
+    model
 };
 
 /*

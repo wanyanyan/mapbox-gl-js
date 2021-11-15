@@ -119,6 +119,19 @@ export type RasterSourceSpecification = {
     "volatile"?: boolean
 }
 
+export type ModelSourceSpecification = {
+    "type": "model",
+    "url"?: string,
+    "tiles"?: Array<string>,
+    "bounds"?: [number, number, number, number],
+    "minzoom"?: number,
+    "maxzoom"?: number,
+    "tileSize"?: number,
+    "scheme"?: "xyz" | "tms",
+    "attribution"?: string,
+    "volatile"?: boolean
+}
+
 export type RasterDEMSourceSpecification = {
     "type": "raster-dem",
     "url"?: string,
@@ -165,10 +178,11 @@ export type ImageSourceSpecification = {|
 export type SourceSpecification =
     | VectorSourceSpecification
     | RasterSourceSpecification
+    | ModelSourceSpecification
     | RasterDEMSourceSpecification
     | GeoJSONSourceSpecification
     | VideoSourceSpecification
-    | ImageSourceSpecification
+    | ImageSourceSpecification;
 
 export type FillLayerSpecification = {|
     "id": string,
@@ -394,6 +408,30 @@ export type RasterLayerSpecification = {|
     |}
 |}
 
+export type ModelLayerSpecification = {|
+    "id": string,
+    "type": "model",
+    "metadata"?: mixed,
+    "source": string,
+    "source-layer"?: string,
+    "minzoom"?: number,
+    "maxzoom"?: number,
+    "filter"?: FilterSpecification,
+    "layout"?: {|
+        "visibility"?: "visible" | "none"
+    |},
+    "paint"?: {|
+        "model-opacity"?: PropertyValueSpecification<number>,
+        "model-hue-rotate"?: PropertyValueSpecification<number>,
+        "model-brightness-min"?: PropertyValueSpecification<number>,
+        "model-brightness-max"?: PropertyValueSpecification<number>,
+        "model-saturation"?: PropertyValueSpecification<number>,
+        "model-contrast"?: PropertyValueSpecification<number>,
+        "model-resampling"?: PropertyValueSpecification<"linear" | "nearest">,
+        "model-fade-duration"?: PropertyValueSpecification<number>
+    |}
+|}
+
 export type HillshadeLayerSpecification = {|
     "id": string,
     "type": "hillshade",
@@ -462,6 +500,7 @@ export type LayerSpecification =
     | HeatmapLayerSpecification
     | FillExtrusionLayerSpecification
     | RasterLayerSpecification
+    | ModelLayerSpecification
     | HillshadeLayerSpecification
     | BackgroundLayerSpecification
     | SkyLayerSpecification;

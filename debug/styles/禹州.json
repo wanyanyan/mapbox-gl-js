@@ -1,0 +1,57 @@
+{
+  "version": 8,
+  "sources": {
+    "raster": {
+      "url": "http://10.10.10.33:1234/api/tilesets/%E7%A6%B9%E5%B7%9E/tilejson",
+      "type": "raster"
+    },
+    "dem": {
+      "type": "raster-dem",
+      "url": "http://10.10.10.33:1234/api/tilesets/禹州-dem/tilejson"
+    },
+    "yz-models-source": {
+      "type": "model",
+      "tiles": ["http://10.10.10.33:1234/google_tiles/{z}/{x}/{y}.glb"]
+    }
+  },
+  "glyphs": "http://121.40.218.156/api/fonts/v1/dev/{fontstack}/{range}.pbf",
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1
+  },
+  "fog": {
+    "range": [1, 10],
+    "color": "#ffffff",
+    "horizon-blend": 0.1
+  },
+  "layers": [
+    {
+      "id": "raster_map",
+      "source": "raster",
+      "type": "raster"
+    },
+    {
+      "id": "yz-model-layer",
+      "source": "yz-models-source",
+      "type": "model"
+    },
+    {
+      "id": "sky",
+      "type": "sky",
+      "paint": {
+        "sky-type": "atmosphere",
+        "sky-opacity": [
+          "interpolate",
+          ["exponential", 0.1],
+          ["zoom"],
+          5,
+          0,
+          22,
+          1
+        ]
+      }
+    }
+  ],
+  "center": [109.753, 19.342],
+  "zoom": 8.4
+}

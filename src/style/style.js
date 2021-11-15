@@ -317,6 +317,9 @@ class Style extends Evented {
         this._serializedLayers = {};
         for (let layer of layers) {
             layer = createStyleLayer(layer);
+            if (layer.type === 'model') {
+                layer.onAdd(this.map)
+            }
             layer.setEventedParent(this, {layer: {id: layer.id}});
             this._layers[layer.id] = layer;
             this._serializedLayers[layer.id] = layer.serialize();

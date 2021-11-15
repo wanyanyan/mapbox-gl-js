@@ -36,6 +36,7 @@ import fill from './draw_fill.js';
 import fillExtrusion from './draw_fill_extrusion.js';
 import hillshade from './draw_hillshade.js';
 import raster from './draw_raster.js';
+import model from './draw_model.js';
 import background from './draw_background.js';
 import debug, {drawDebugPadding, drawDebugQueryGeometry} from './draw_debug.js';
 import custom from './draw_custom.js';
@@ -52,6 +53,7 @@ const draw = {
     'fill-extrusion': fillExtrusion,
     hillshade,
     raster,
+    model,
     background,
     sky,
     debug,

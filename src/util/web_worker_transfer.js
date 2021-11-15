@@ -9,6 +9,7 @@ import CompoundExpression from '../style-spec/expression/compound_expression.js'
 import expressions from '../style-spec/expression/definitions/index.js';
 import ResolvedImage from '../style-spec/expression/types/resolved_image.js';
 import window from './window.js';
+import * as THREE from 'three'
 const {ImageData, ImageBitmap} = window;
 
 import type {Transferable} from '../types/transferable.js';
@@ -134,7 +135,8 @@ export function serialize(input: mixed, transferables: ?Array<Transferable>): Se
         input instanceof Number ||
         input instanceof String ||
         input instanceof Date ||
-        input instanceof RegExp) {
+        input instanceof RegExp ||
+        input instanceof THREE.Object3D) {
         return input;
     }
 

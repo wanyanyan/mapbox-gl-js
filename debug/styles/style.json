@@ -1,0 +1,174 @@
+{
+  "styleId": "LwyzKdttbP",
+  "owner": "dev",
+  "type": "style",
+  "name": "武汉市基础地图",
+  "tags": [],
+  "metadata": {},
+  "version": 8,
+  "center": [114.39194587621114, 30.509657360082002],
+  "zoom": 17.2128301110795,
+  "bearing": 0,
+  "pitch": 44.00000000000005,
+  "sources": {
+    "WuHan-GJnBUYRLRT": {
+      "url": "http://121.40.218.156/api/tilesets/v1/dev/WuHan-GJnBUYRLRT/tilejson",
+      "type": "vector"
+    }
+  },
+  "sprite": "http://10.10.10.33:9966/debug/textures/sprite",
+  "glyphs": "http://121.40.218.156/api/fonts/v1/dev/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "rgba(0,0,0,0)"
+      }
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "type": "fill",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "全市范围线",
+      "paint": {
+        "fill-color": "hsl(65, 4%, 93%)",
+        "fill-pattern": "h6"
+      },
+      "source-layer": "全市范围线"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {},
+      "type": "fill",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "water-a",
+      "paint": {
+        "fill-color": "hsl(182, 43%, 73%)",
+        "fill-pattern": "水面"
+      },
+      "source-layer": "water_a"
+    },
+    {
+      "minzoom": 14,
+      "layout": {},
+      "filter": ["in", "fclass", "farmland", "farmyard", "grass", "park"],
+      "type": "fill",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "landuse-a",
+      "paint": {
+        "fill-color": "hsl(101, 56%, 65%)",
+        "fill-pattern": "草地"
+      },
+      "source-layer": "landuse_a"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible",
+        "line-join": "round"
+      },
+      "type": "line",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "roads",
+      "paint": {
+        "line-width": {
+          "base": 1,
+          "stops": [
+            [14, 8],
+            [15, 10],
+            [16, 12],
+            [17, 20],
+            [18, 50],
+            [20, 80]
+          ]
+        },
+        "line-pattern": "道路3"
+      },
+      "filter": ["all",
+        [">=", "layer", 0],
+        ["in", "fclass", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "trunk", "trunk_link"]
+      ],
+      "source-layer": "roads"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible",
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "type": "line",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "人行道",
+      "paint": {
+        "line-width": {
+          "base": 1,
+          "stops": [
+            [14, 2],
+            [15, 3],
+            [16, 5],
+            [17, 10],
+            [18, 20],
+            [20, 25]
+          ]
+        },
+        "line-pattern": "人行道"
+      },
+      "filter": ["all",
+        [">=", "layer", 0],
+        ["in", "fclass", "footway"],
+        ["in", "bridge", "F"]
+      ],
+      "source-layer": "roads"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "filter": ["in", "fclass", "parking", "parking_multistorey"],
+      "type": "fill",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "traffic-a",
+      "paint": {
+        "fill-color": "hsl(211, 76%, 26%)",
+        "fill-pattern": "停车场"
+      },
+      "source-layer": "traffic_a"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "type": "fill-extrusion",
+      "source": "WuHan-GJnBUYRLRT",
+      "id": "buildings",
+      "paint": {
+        "fill-extrusion-color": "#ccc",
+        "fill-extrusion-height": ["*", ["get", "DSCS"], 3],
+        "fill-extrusion-pattern": {
+          "base": 1,
+          "type": "interval",
+          "property": "DSCS",
+          "stops": [
+            [20, "dgqtb91147"],
+            [50, "dgjzb03472"],
+            [80, "dgjzb03351"]
+          ],
+          "default": "dgqtb91147"
+        }
+      },
+      "source-layer": "buildings"
+    }
+  ],
+  "createdAt": "2021-09-28T04:39:36.176Z",
+  "updatedAt": "2021-09-28T04:39:36.176Z"
+}

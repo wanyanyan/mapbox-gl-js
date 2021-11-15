@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox GL JS debug page</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel='stylesheet' href='../dist/mapbox-gl.css' />
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+
+<body>
+<div id='map'></div>
+
+<script src='../dist/mapbox-gl-dev.js'></script>
+<script src='../debug/access_token_generated.js'></script>
+<script>
+var map = window.map = new mapboxgl.Map({
+  container: 'map',
+  antialias: true,
+  zoom: 18,
+  maxTileCacheSize: 20,
+  center: [113.4778287528, 34.136178322],
+  bearing: 0,
+  pitch: 0,
+  style: './styles/禹州.json',
+  hash: false
+});
+
+map.on('load', function() {
+  map.showTileBoundaries = true
+});
+</script>
+</body>
+</html>

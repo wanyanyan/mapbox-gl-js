@@ -49,6 +49,11 @@ export type WorkerDEMTileParameters = TileParameters & {
     buildQuadTree?: boolean
 };
 
+export type WorkerModelTileParameters = TileParameters & {
+    coord: { z: number, x: number, y: number, w: number },
+    rawData: ArrayBuffer
+};
+
 export type WorkerTileResult = {
     buckets: Array<Bucket>,
     imageAtlas: ImageAtlas,
@@ -66,6 +71,7 @@ export type WorkerTileResult = {
 
 export type WorkerTileCallback = (error: ?Error, result: ?WorkerTileResult) => void;
 export type WorkerDEMTileCallback = (err: ?Error, result: ?DEMData) => void;
+export type WorkerModelTileCallback = (err: ?Error, result: any) => void;
 
 /**
  * May be implemented by custom source types to provide code that can be run on

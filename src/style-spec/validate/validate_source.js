@@ -28,6 +28,7 @@ export default function validateSource(options) {
     case 'vector':
     case 'raster':
     case 'raster-dem':
+    case 'model':
         errors = validateObject({
             key,
             value,

@@ -5,6 +5,7 @@ import Actor from '../util/actor.js';
 import StyleLayerIndex from '../style/style_layer_index.js';
 import VectorTileWorkerSource from './vector_tile_worker_source.js';
 import RasterDEMTileWorkerSource from './raster_dem_tile_worker_source.js';
+import ModelTileWorkerSource from './model_tile_worker_source.js';
 import GeoJSONWorkerSource from './geojson_worker_source.js';
 import assert from 'assert';
 import {plugin as globalRTLTextPlugin} from './rtl_text_plugin.js';
@@ -19,8 +20,10 @@ import type {
     WorkerDEMTileParameters,
     WorkerTileCallback,
     WorkerDEMTileCallback,
-    TileParameters
-} from '../source/worker_source.js';
+    WorkerModelTileParameters,
+    WorkerModelTileCallback,
+    TileParameters,
+} from "../source/worker_source.js";
 
 import type {WorkerGlobalScopeInterface} from '../util/web_worker.js';
 import type {Callback} from '../types/callback.js';
@@ -38,6 +41,7 @@ export default class Worker {
     workerSourceTypes: {[_: string]: Class<WorkerSource> };
     workerSources: {[_: string]: {[_: string]: {[_: string]: WorkerSource } } };
     demWorkerSources: {[_: string]: {[_: string]: RasterDEMTileWorkerSource } };
+    modelWorkerSources: {[_: string]: {[_: string]: ModelTileWorkerSource } };
     isSpriteLoaded: boolean;
     referrer: ?string;
     terrain: ?boolean;
@@ -59,6 +63,7 @@ export default class Worker {
         // [mapId][sourceType][sourceName] => worker source instance
         this.workerSources = {};
         this.demWorkerSources = {};
+        this.modelWorkerSources = {};
 
         this.self.registerWorkerSource = (name: string, WorkerSource: Class<WorkerSource>) => {
             if (this.workerSourceTypes[name]) {
@@ -135,6 +140,11 @@ export default class Worker {
     loadDEMTile(mapId: string, params: WorkerDEMTileParameters, callback: WorkerDEMTileCallback) {
         const p = this.enableTerrain ? extend({buildQuadTree: this.terrain}, params) : params;
         this.getDEMWorkerSource(mapId, params.source).loadTile(p, callback);
+    }
+
+    loadModelTile(mapId: string, params: WorkerModelTileParameters, callback: WorkerModelTileCallback) {
+        const p = this.enableTerrain ? extend({buildQuadTree: this.terrain}, params) : params;
+        this.getModelWorkerSource(mapId, params.source).loadTile(p, callback);
     }
 
     reloadTile(mapId: string, params: WorkerTileParameters & {type: string}, callback: WorkerTileCallback) {
@@ -255,6 +265,17 @@ export default class Worker {
         }
 
         return this.demWorkerSources[mapId][source];
+    }
+
+    getModelWorkerSource(mapId: string, source: string) {
+        if (!this.modelWorkerSources[mapId])
+            this.modelWorkerSources[mapId] = {};
+
+        if (!this.modelWorkerSources[mapId][source]) {
+            this.modelWorkerSources[mapId][source] = new ModelTileWorkerSource();
+        }
+
+        return this.modelWorkerSources[mapId][source];
     }
 
     enforceCacheSizeLimit(mapId: string, limit: number) {
