@@ -37,7 +37,6 @@ function drawModel(painter: Painter, sourceCache: SourceCache, layer: ModelStyle
                 coveredModels.push(tile.model);
             }
         }
-        console.log(coords)
         layer.updateModels(coveredModels);
 
         layer.render(context.gl, painter.transform.customLayerMatrix());

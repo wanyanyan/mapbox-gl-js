@@ -42,6 +42,7 @@ import PauseablePlacement from './pauseable_placement.js';
 import ZoomHistory from './zoom_history.js';
 import CrossTileSymbolIndex from '../symbol/cross_tile_symbol_index.js';
 import {validateCustomStyleLayer} from './style_layer/custom_style_layer.js';
+import { AmbientLight } from 'three';
 
 // We're skipping validation errors with the `source.canvas` identifier in order
 // to continue to allow canvas sources to be added at runtime/updated in
@@ -317,7 +318,7 @@ class Style extends Evented {
         this._serializedLayers = {};
         for (let layer of layers) {
             layer = createStyleLayer(layer);
-            if (layer.type === 'model') {
+            if (layer.onAdd) {
                 layer.onAdd(this.map)
             }
             layer.setEventedParent(this, {layer: {id: layer.id}});
@@ -328,6 +329,10 @@ class Style extends Evented {
         this.dispatcher.broadcast('setLayers', this._serializeLayers(this._order));
 
         this.light = new Light(this.stylesheet.light);
+        // threejs场景的光照
+        let light3 = new AmbientLight('#ffffff', 1.2);
+        this.map._scene3.add(light3)
+
         if (this.stylesheet.terrain) {
             this._createTerrain(this.stylesheet.terrain);
         }

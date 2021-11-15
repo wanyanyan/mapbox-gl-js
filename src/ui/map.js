@@ -30,6 +30,7 @@ import webpSupported from '../util/webp_supported.js';
 import {PerformanceMarkers, PerformanceUtils} from '../util/performance.js';
 import Marker from '../ui/marker.js';
 import EasedVariable from '../util/eased_variable.js';
+import * as THREE from 'three'
 
 import {setCacheLimits} from '../util/tile_request_cache.js';
 
@@ -474,6 +475,7 @@ class Map extends Camera {
 
         this._setupContainer();
         this._setupPainter();
+        this._setupScene();
         if (this.painter === undefined) {
             throw new Error(`Failed to initialize WebGL.`);
         }
@@ -2555,6 +2557,16 @@ class Map extends Camera {
         // Maintain the same canvas size, potentially downscaling it for HiDPI displays
         this._canvas.style.width = `${width}px`;
         this._canvas.style.height = `${height}px`;
+    }
+
+    _setupScene() {
+        this._camera3 = new THREE.Camera();
+        this._scene3 = new THREE.Scene();
+        this._renderer3 = new THREE.WebGLRenderer({
+            canvas: this._canvas,
+            context: this.painter.context.gl,
+        });
+        this._renderer3.autoClear = false;
     }
 
     _addMarker(marker: Marker) {
