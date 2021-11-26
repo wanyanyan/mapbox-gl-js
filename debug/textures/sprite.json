@@ -1,72 +1,121 @@
 {
   "dgjzb03351": {
+    "x": 256,
+    "y": 384,
     "width": 64,
     "height": 64,
-    "x": 0,
-    "y": 0,
-    "pixelRatio": 1
+	"pixelRatio": 1
   },
   "dgjzb03472": {
+    "x": 320,
+    "y": 384,
     "width": 64,
     "height": 64,
-    "x": 64,
-    "y": 0,
-    "pixelRatio": 1
+	"pixelRatio": 1
   },
   "dgqtb91147": {
+    "x": 384,
+    "y": 384,
     "width": 64,
     "height": 64,
+	"pixelRatio": 1
+  },
+  "人行路1": {
+    "x": 0,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "人行路2": {
     "x": 128,
     "y": 0,
-    "pixelRatio": 1
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h3": {
-    "width": 47,
-    "height": 60,
+  "人行路3": {
     "x": 0,
-    "y": 64,
-    "pixelRatio": 1
+    "y": 128,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h5": {
-    "width": 70,
-    "height": 56,
-    "x": 47,
-    "y": 64,
-    "pixelRatio": 1
+  "地面1": {
+    "x": 128,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "grass": {
-    "width": 22,
-    "height": 48,
-    "x": 117,
-    "y": 64,
-    "pixelRatio": 1
+  "地面2": {
+    "x": 256,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h1": {
-    "width": 44,
-    "height": 45,
-    "x": 139,
-    "y": 64,
-    "pixelRatio": 1
+  "地面3": {
+    "x": 256,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h6": {
-    "width": 44,
-    "height": 44,
+  "地面4": {
     "x": 0,
-    "y": 124,
-    "pixelRatio": 1
+    "y": 256,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h2": {
-    "width": 42,
-    "height": 36,
-    "x": 44,
-    "y": 124,
-    "pixelRatio": 1
+  "广场": {
+    "x": 128,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   },
-  "h4": {
-    "width": 74,
-    "height": 31,
-    "x": 86,
-    "y": 124,
-    "pixelRatio": 1
+  "水": {
+    "x": 256,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "草1": {
+    "x": 384,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "草2": {
+    "x": 384,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "路1": {
+    "x": 384,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "路2": {
+    "x": 0,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
+  },
+  "路3": {
+    "x": 128,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+	"pixelRatio": 1
   }
 }

@@ -1,0 +1,95 @@
+{
+  "styleId": "hSucWYGLnQ",
+  "name": "禹州市地图",
+  "version": 8,
+  "center": [113.48107556014179, 34.139488860734716],
+  "zoom": 16.612602661431087,
+  "bearing": 0,
+  "pitch": 0,
+  "light": {
+    "anchor": "viewport"
+  },
+  "sources": {
+    "基础地理信息-SLrdgfZusl": {
+      "url": "http://121.40.218.156/api/tilesets/v1/dev/基础地理信息-SLrdgfZusl/tilejson",
+      "type": "vector"
+    },
+    "禹州土地利用测试-SlVdPZuoEF": {
+      "url": "http://121.40.218.156/api/tilesets/v1/dev/禹州土地利用测试-SlVdPZuoEF/tilejson",
+      "type": "vector"
+    }
+  },
+  "sprite": "http://localhost:9966/debug/textures/sprite",
+  "glyphs": "http://121.40.218.156/api/fonts/v1/dev/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "rgba(0,0,0,0)"
+      }
+    },
+    {
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {},
+      "filter": ["==", "name", "禹州市"],
+      "type": "fill",
+      "source": "基础地理信息-SLrdgfZusl",
+      "id": "县级行政区划",
+      "paint": {
+        "fill-color": "hsl(65, 4%, 93%)",
+        "fill-pattern": "地面3"
+      },
+      "source-layer": "县级行政区划"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "filter": ["==", "type", "广场"],
+      "type": "fill",
+      "source": "禹州土地利用测试-SlVdPZuoEF",
+      "id": "广场",
+      "paint": {
+        "fill-color": "hsl(0, 0%, 65%)",
+        "fill-pattern": "广场"
+      },
+      "source-layer": "土地利用_2000"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "type": "fill",
+      "source": "禹州土地利用测试-SlVdPZuoEF",
+      "id": "水面",
+      "paint": {
+        "fill-color": "hsl(194, 83%, 43%)",
+        "fill-pattern": "水"
+      },
+      "source-layer": "水面_2000"
+    },
+    {
+      "minzoom": 14,
+      "layout": {
+        "visibility": "visible"
+      },
+      "metadata": {},
+      "filter": ["==", "type", "绿地"],
+      "type": "fill",
+      "source": "禹州土地利用测试-SlVdPZuoEF",
+      "id": "绿地",
+      "paint": {
+        "fill-color": "hsl(101, 56%, 65%)",
+        "fill-pattern": "草1"
+      },
+      "source-layer": "土地利用_2000"
+    }
+  ],
+  "createdAt": "2021-11-24T07:20:21.278Z",
+  "updatedAt": "2021-11-24T07:20:21.278Z"
+}

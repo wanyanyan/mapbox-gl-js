@@ -17,7 +17,7 @@ class ModelStyleLayer extends StyleLayer {
 
     constructor(layer: LayerSpecification) {
         super(layer, properties);
-        const origin = [113.457765, 34.146185];
+        const origin = [ 113.45896844942067, 34.146198405934076 ];
         let _altitude = 0;
         let _rotation = [0, 0, 0];
         let coord = MercatorCoordinate.fromLngLat(origin, _altitude);

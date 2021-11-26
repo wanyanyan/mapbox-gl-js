@@ -2,16 +2,16 @@
   "version": 8,
   "sources": {
     "raster": {
-      "url": "http://10.10.10.33:1234/api/tilesets/%E7%A6%B9%E5%B7%9E/tilejson",
+      "url": "http://121.40.218.156/api/tilesets/v1/dev/禹州-sPeTWCVyXE/tilejson",
       "type": "raster"
     },
     "dem": {
       "type": "raster-dem",
-      "url": "http://10.10.10.33:1234/api/tilesets/禹州-dem/tilejson"
+      "url": "http://121.40.218.156/api/tilesets/v1/dev/禹州-dem-VlWIPepYuH/tilejson"
     },
     "yz-models-source": {
       "type": "model",
-      "tiles": ["http://10.10.10.33:1234/google_tiles/{z}/{x}/{y}.glb"]
+      "tiles": ["http://10.10.10.33/禹州模型/google_tiles/{z}/{x}/{y}.glb"]
     }
   },
   "glyphs": "http://121.40.218.156/api/fonts/v1/dev/{fontstack}/{range}.pbf",
