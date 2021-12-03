@@ -6,6 +6,7 @@ import {Evented} from '../util/evented.js';
 import {OverscaledTileID} from './tile_id.js';
 import RasterTileSource from './raster_tile_source.js';
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import * as THREE from 'three'
 
 import type {Source} from './source.js';
 import type Dispatcher from '../util/dispatcher.js';
@@ -101,7 +102,9 @@ class ModelTileSource extends RasterTileSource implements Source {
             tile.fbo.destroy();
             delete tile.fbo;
         }
-        if (tile.model) delete tile.model;
+        if (tile.model) {
+            delete tile.model
+        }
         delete tile.neighboringTiles;
 
         tile.state = 'unloaded';

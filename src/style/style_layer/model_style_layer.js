@@ -63,12 +63,69 @@ class ModelStyleLayer extends StyleLayer {
             if (isInCoveredModels >= 0) {
                 coveredModels.splice(isInCoveredModels, 1)
             } else {
-                item.removeFromParent();
+                this._removeObject(item)
             }
         })
         coveredModels.forEach(item => {
             scene.add(item)
         })
+    }
+
+    _track(resource) {
+        if (!resource) {
+            return resource;
+        }
+        // handle children and when material is an array of materials or
+        // uniform is array of textures
+        if (Array.isArray(resource)) {
+            resource.forEach(item => this._track(item));
+            return resource;
+        }
+ 
+        if (resource.dispose || resource instanceof THREE.Object3D) {
+            this.resources.add(resource);
+        }
+        if (resource instanceof THREE.Object3D) {
+            this._track(resource.geometry);
+            this._track(resource.material);
+            this._track(resource.children);
+        } else if (resource instanceof THREE.Material) {
+            // We have to check if there are any textures on the material
+            for (const value of Object.values(resource)) {
+                if (value instanceof THREE.Texture) {
+                    this._track(value);
+                }
+            }
+            // We also have to check if any uniforms reference textures or arrays of textures
+            if (resource.uniforms) {
+                for (const value of Object.values(resource.uniforms)) {
+                    if (value) {
+                        const uniformValue = value.value;
+                        if (uniformValue instanceof THREE.Texture ||
+                            Array.isArray(uniformValue)) {
+                            this._track(uniformValue);
+                        }
+                    }
+                }
+            }
+        }
+        
+    }
+
+    _removeObject(item) {
+        this.resources = new Set();
+        this._track(item)
+        for (const resource of this.resources) {
+            if (resource instanceof THREE.Object3D) {
+                if (resource.parent) {
+                    resource.parent.remove(resource);
+                }
+            }
+            if (resource.dispose) {
+                resource.dispose();
+            }
+        }
+        this.resources.clear();
     }
 
     render(gl, matrix) {

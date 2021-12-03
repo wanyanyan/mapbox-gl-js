@@ -27,7 +27,7 @@
       "tiles": ["http://10.10.10.33/禹州模型/google_tiles/{z}/{x}/{y}.glb"]
     }
   },
-  "sprite": "http://localhost:9966/debug/textures/sprite",
+  "sprite": "http://10.10.10.33/禹州模型/sprite",
   "glyphs": "http://121.40.218.156/api/fonts/v1/dev/{fontstack}/{range}.pbf",
   "terrain": {
     "source": "dem",
@@ -132,7 +132,7 @@
         "line-width": 8,
         "line-pattern": "人行路3"
       },
-      "source-layer": "人行道_2000"
+      "source-layer": "道路_2000"
     },
     {
       "minzoom": 14,
@@ -150,7 +150,7 @@
         "line-color": "hsl(0, 0%, 34%)",
         "line-pattern": "路3"
       },
-      "source-layer": "人行道_2000"
+      "source-layer": "道路_2000"
     },
     {
       "minzoom": 14,
@@ -168,7 +168,7 @@
         "line-color": "hsl(0, 0%, 40%)",
         "line-pattern": "路2"
       },
-      "source-layer": "人行道_2000"
+      "source-layer": "道路_2000"
     },
     {
       "minzoom": 14,
@@ -185,7 +185,12 @@
         "line-color": "hsl(36, 84%, 61%)",
         "line-pattern": "路1"
       },
-      "source-layer": "人行道_2000"
+      "source-layer": "道路_2000"
+    },
+    {
+      "id": "yz-model-layer",
+      "source": "yz-models-source",
+      "type": "model"
     }
   ],
   "createdAt": "2021-11-24T07:20:21.278Z",

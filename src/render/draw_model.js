@@ -40,9 +40,5 @@ function drawModel(painter: Painter, sourceCache: SourceCache, layer: ModelStyle
         layer.updateModels(coveredModels);
 
         layer.render(context.gl, painter.transform.customLayerMatrix());
-
-        context.setDirty();
-        painter.setBaseState();
-        context.bindFramebuffer.set(null);
     }
 }

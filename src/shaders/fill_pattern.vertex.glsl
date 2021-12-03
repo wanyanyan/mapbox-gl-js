@@ -34,8 +34,8 @@ void main() {
     vec2 display_size_b = (pattern_br_b - pattern_tl_b) / pixel_ratio_to;
     gl_Position = u_matrix * vec4(a_pos, 0, 1);
 
-    v_pos_a = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, fromScale * display_size_a, tileZoomRatio, a_pos);
-    v_pos_b = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, toScale * display_size_b, tileZoomRatio, a_pos);
+    v_pos_a = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, vec2(128.0, 128.0), 1.0, a_pos);
+    v_pos_b = get_pattern_pos(u_pixel_coord_upper, u_pixel_coord_lower, vec2(128.0, 128.0), 1.0, a_pos);
 
 #ifdef FOG
     v_fog_pos = fog_position(a_pos);
