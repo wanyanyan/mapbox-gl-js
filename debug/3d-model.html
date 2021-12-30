@@ -32,6 +32,9 @@ var map = window.map = new mapboxgl.Map({
 map.on('load', function() {
   map.showTileBoundaries = true
 });
+map.on('click', e => {
+  console.log(map.queryRenderedModels(e.point))
+})
 </script>
 </body>
 </html>

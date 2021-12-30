@@ -1400,6 +1400,22 @@ class Map extends Camera {
         return this.style.queryRenderedFeatures(geometry, options, this.transform);
     }
 
+    queryRenderedModels(geometry?: PointLike | [PointLike, PointLike], options?: Object) {
+        if (!this.style) {
+            return [];
+        }
+
+        if (options === undefined && geometry !== undefined && !(geometry instanceof Point) && !Array.isArray(geometry)) {
+            options = (geometry: Object);
+            geometry = undefined;
+        }
+
+        options = options || {};
+        geometry = geometry || [[0, 0], [this.transform.width, this.transform.height]];
+
+        return this.style.queryRenderedModels(geometry, options, this.transform);
+    }
+
     /**
      * Returns an array of [GeoJSON](http://geojson.org/)
      * [Feature objects](https://tools.ietf.org/html/rfc7946#section-3.2)
@@ -2560,7 +2576,7 @@ class Map extends Camera {
     }
 
     _setupScene() {
-        this._camera3 = new THREE.Camera();
+        this._camera3 = new THREE.PerspectiveCamera();
         this._scene3 = new THREE.Scene();
         this._renderer3 = new THREE.WebGLRenderer({
             canvas: this._canvas,

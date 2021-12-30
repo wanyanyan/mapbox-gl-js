@@ -50,7 +50,37 @@ class ModelStyleLayer extends StyleLayer {
     }
 
     onRemove(map: Map) {
-        console.log("onRemove");
+        this.removeObj(this.map._scene3)
+        let renderer = this.map._renderer3
+        renderer.renderLists.dispose();
+        renderer.dispose();
+        //renderer.forceContextLoss();
+        //renderer.domElement = null;
+        renderer.content = null;
+        this.map._renderer3 = null;
+        THREE.Cache.clear();
+    }
+
+    clearCache(item) {
+        item.geometry && item.geometry.dispose()
+        item.material && item.material.dispose()
+        if (item.dispose) {
+            item.dispose()
+        }
+    }
+
+    removeObj(obj) {
+        let arr = obj.children.filter(x => x);
+        arr.forEach(item => {
+        if (item.children.length) {
+            this.removeObj(item);
+        } else {
+            this.clearCache(item);
+            item.clear();
+        }
+        });
+        obj.clear();
+        arr = null;
     }
 
     updateModels(coveredModels) {
@@ -63,7 +93,7 @@ class ModelStyleLayer extends StyleLayer {
             if (isInCoveredModels >= 0) {
                 coveredModels.splice(isInCoveredModels, 1)
             } else {
-                this._removeObject(item)
+                this.removeObj(item)
             }
         })
         coveredModels.forEach(item => {

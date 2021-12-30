@@ -42,7 +42,7 @@ import PauseablePlacement from './pauseable_placement.js';
 import ZoomHistory from './zoom_history.js';
 import CrossTileSymbolIndex from '../symbol/cross_tile_symbol_index.js';
 import {validateCustomStyleLayer} from './style_layer/custom_style_layer.js';
-import { AmbientLight } from 'three';
+import { AmbientLight, Raycaster, Vector2 } from 'three';
 
 // We're skipping validation errors with the `source.canvas` identifier in order
 // to continue to allow canvas sources to be added at runtime/updated in
@@ -1350,6 +1350,24 @@ class Style extends Evented {
             results = results.concat(querySourceFeatures(sourceCache, params));
         }
         return results;
+    }
+
+    queryRenderedModels(point, options) {
+        var width = this.map._container.clientWidth;
+        var height = this.map._container.clientHeight;
+        const raycaster = new Raycaster();
+        const mouse = new Vector2();
+        mouse.x = (point.x / width) * 2 - 1;
+        mouse.y = -(point.y / height) * 2 + 1;
+        raycaster.setFromCamera(mouse, this.map._camera3);
+        let allMeshs = []
+        this.map._scene3.traverse(e => {
+        if (e.isMesh) {
+            allMeshs.push(e)
+        }
+        })
+        const intersects = raycaster.intersectObjects(allMeshs)
+        return intersects.map(d => d.object);
     }
 
     addSourceType(name: string, SourceType: SourceClass, callback: Callback<void>) {
