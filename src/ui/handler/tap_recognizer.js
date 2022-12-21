@@ -18,7 +18,7 @@ const MAX_DIST = 30;
 export class SingleTapRecognizer {
 
     numTouches: number;
-    centroid: Point;
+    centroid: ?Point;
     startTime: number;
     aborted: boolean;
     touches: { [number | string]: Point };
@@ -29,9 +29,9 @@ export class SingleTapRecognizer {
     }
 
     reset() {
-        delete this.centroid;
-        delete this.startTime;
-        delete this.touches;
+        this.centroid = undefined;
+        this.startTime = 0;
+        this.touches = {};
         this.aborted = false;
     }
 
@@ -44,7 +44,7 @@ export class SingleTapRecognizer {
             return;
         }
 
-        if (this.startTime === undefined) {
+        if (this.startTime === 0) {
             this.startTime = e.timeStamp;
         }
 
@@ -67,7 +67,7 @@ export class SingleTapRecognizer {
         }
     }
 
-    touchend(e: TouchEvent, points: Array<Point>, mapTouches: Array<Touch>) {
+    touchend(e: TouchEvent, points: Array<Point>, mapTouches: Array<Touch>): ?Point {
         if (!this.centroid || e.timeStamp - this.startTime > MAX_TOUCH_TIME) {
             this.aborted = true;
         }
@@ -86,7 +86,7 @@ export class TapRecognizer {
     singleTap: SingleTapRecognizer;
     numTaps: number;
     lastTime: number;
-    lastTap: Point;
+    lastTap: ?Point;
     count: number;
 
     constructor(options: { numTaps: number, numTouches: number }) {
@@ -97,7 +97,7 @@ export class TapRecognizer {
 
     reset() {
         this.lastTime = Infinity;
-        delete this.lastTap;
+        this.lastTap = undefined;
         this.count = 0;
         this.singleTap.reset();
     }
@@ -110,7 +110,7 @@ export class TapRecognizer {
         this.singleTap.touchmove(e, points, mapTouches);
     }
 
-    touchend(e: TouchEvent, points: Array<Point>, mapTouches: Array<Touch>) {
+    touchend(e: TouchEvent, points: Array<Point>, mapTouches: Array<Touch>): ?Point {
         const tap = this.singleTap.touchend(e, points, mapTouches);
         if (tap) {
             const soonEnough = e.timeStamp - this.lastTime < MAX_TAP_INTERVAL;

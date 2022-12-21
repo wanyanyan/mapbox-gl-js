@@ -13,6 +13,7 @@ import {enforceCacheSizeLimit} from '../util/tile_request_cache.js';
 import {extend} from '../util/util.js';
 import {PerformanceUtils} from '../util/performance.js';
 import {Event} from '../util/evented.js';
+import {getProjection} from '../geo/projection/index.js';
 
 import type {
     WorkerSource,
@@ -27,8 +28,9 @@ import type {
 
 import type {WorkerGlobalScopeInterface} from '../util/web_worker.js';
 import type {Callback} from '../types/callback.js';
-import type {LayerSpecification} from '../style-spec/types.js';
+import type {LayerSpecification, ProjectionSpecification} from '../style-spec/types.js';
 import type {PluginState} from './rtl_text_plugin.js';
+import type Projection from '../geo/projection/projection.js';
 
 /**
  * @private
@@ -42,7 +44,9 @@ export default class Worker {
     workerSources: {[_: string]: {[_: string]: {[_: string]: WorkerSource } } };
     demWorkerSources: {[_: string]: {[_: string]: RasterDEMTileWorkerSource } };
     modelWorkerSources: {[_: string]: {[_: string]: ModelTileWorkerSource } };
-    isSpriteLoaded: boolean;
+    projections: {[_: string]: Projection };
+    defaultProjection: Projection;
+    isSpriteLoaded: {[_: string]: boolean };
     referrer: ?string;
     terrain: ?boolean;
 
@@ -53,7 +57,10 @@ export default class Worker {
 
         this.layerIndexes = {};
         this.availableImages = {};
-        this.isSpriteLoaded = false;
+        this.isSpriteLoaded = {};
+
+        this.projections = {};
+        this.defaultProjection = getProjection({name: 'mercator'});
 
         this.workerSourceTypes = {
             vector: VectorTileWorkerSource,
@@ -83,6 +90,14 @@ export default class Worker {
         };
     }
 
+    clearCaches(mapId: string, unused: mixed, callback: WorkerTileCallback) {
+        delete this.layerIndexes[mapId];
+        delete this.availableImages[mapId];
+        delete this.workerSources[mapId];
+        delete this.demWorkerSources[mapId];
+        callback();
+    }
+
     checkIfReady(mapID: string, unused: mixed, callback: WorkerTileCallback) {
         // noop, used to check if a worker is fully set up and ready to receive messages
         callback();
@@ -93,7 +108,7 @@ export default class Worker {
     }
 
     spriteLoaded(mapId: string, bool: boolean) {
-        this.isSpriteLoaded = bool;
+        this.isSpriteLoaded[mapId] = bool;
         for (const workerSource in this.workerSources[mapId]) {
             const ws = this.workerSources[mapId][workerSource];
             for (const source in ws) {
@@ -121,6 +136,10 @@ export default class Worker {
         callback();
     }
 
+    setProjection(mapId: string, config: ProjectionSpecification) {
+        this.projections[mapId] = getProjection(config);
+    }
+
     setLayers(mapId: string, layers: Array<LayerSpecification>, callback: WorkerTileCallback) {
         this.getLayerIndex(mapId).replace(layers);
         callback();
@@ -134,6 +153,7 @@ export default class Worker {
     loadTile(mapId: string, params: WorkerTileParameters & {type: string}, callback: WorkerTileCallback) {
         assert(params.type);
         const p = this.enableTerrain ? extend({enableTerrain: this.terrain}, params) : params;
+        p.projection = this.projections[mapId] || this.defaultProjection;
         this.getWorkerSource(mapId, params.type, params.source).loadTile(p, callback);
     }
 
@@ -150,6 +170,7 @@ export default class Worker {
     reloadTile(mapId: string, params: WorkerTileParameters & {type: string}, callback: WorkerTileCallback) {
         assert(params.type);
         const p = this.enableTerrain ? extend({enableTerrain: this.terrain}, params) : params;
+        p.projection = this.projections[mapId] || this.defaultProjection;
         this.getWorkerSource(mapId, params.type, params.source).reloadTile(p, callback);
     }
 
@@ -217,7 +238,7 @@ export default class Worker {
         }
     }
 
-    getAvailableImages(mapId: string) {
+    getAvailableImages(mapId: string): Array<string> {
         let availableImages = this.availableImages[mapId];
 
         if (!availableImages) {
@@ -227,7 +248,7 @@ export default class Worker {
         return availableImages;
     }
 
-    getLayerIndex(mapId: string) {
+    getLayerIndex(mapId: string): StyleLayerIndex {
         let layerIndexes = this.layerIndexes[mapId];
         if (!layerIndexes) {
             layerIndexes = this.layerIndexes[mapId] = new StyleLayerIndex();
@@ -235,7 +256,7 @@ export default class Worker {
         return layerIndexes;
     }
 
-    getWorkerSource(mapId: string, type: string, source: string) {
+    getWorkerSource(mapId: string, type: string, source: string): WorkerSource {
         if (!this.workerSources[mapId])
             this.workerSources[mapId] = {};
         if (!this.workerSources[mapId][type])
@@ -250,13 +271,13 @@ export default class Worker {
                 },
                 scheduler: this.actor.scheduler
             };
-            this.workerSources[mapId][type][source] = new (this.workerSourceTypes[type]: any)((actor: any), this.getLayerIndex(mapId), this.getAvailableImages(mapId), this.isSpriteLoaded);
+            this.workerSources[mapId][type][source] = new (this.workerSourceTypes[type]: any)((actor: any), this.getLayerIndex(mapId), this.getAvailableImages(mapId), this.isSpriteLoaded[mapId]);
         }
 
         return this.workerSources[mapId][type][source];
     }
 
-    getDEMWorkerSource(mapId: string, source: string) {
+    getDEMWorkerSource(mapId: string, source: string): RasterDEMTileWorkerSource {
         if (!this.demWorkerSources[mapId])
             this.demWorkerSources[mapId] = {};
 

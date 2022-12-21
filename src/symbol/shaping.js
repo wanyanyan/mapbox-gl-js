@@ -61,6 +61,11 @@ export type Shaping = {
     hasBaseline: boolean
 };
 
+type AnchorAlignment = {|
+    horizontalAlign: number,
+    verticalAlign: number
+|};
+
 function isEmpty(positionedLines: Array<PositionedLine>) {
     for (const line of positionedLines) {
         if (line.positionedGlyphs.length !== 0) {
@@ -255,7 +260,6 @@ function shapeText(text: Formatted,
                    translate: [number, number],
                    writingMode: 1 | 2,
                    allowVerticalPlacement: boolean,
-                   symbolPlacement: string,
                    layoutTextSize: number,
                    layoutTextSizeThisZoom: number): Shaping | false {
     const logicalInput = TaggedString.fromFeature(text, defaultFontStack);
@@ -264,15 +268,14 @@ function shapeText(text: Formatted,
         logicalInput.verticalizePunctuation(allowVerticalPlacement);
     }
 
-    let lines: Array<TaggedString>;
+    let lines: Array<TaggedString> = [];
+
+    const lineBreaks = determineLineBreaks(logicalInput, spacing, maxWidth, glyphMap, imagePositions, layoutTextSize);
 
     const {processBidirectionalText, processStyledBidirectionalText} = rtlTextPlugin;
     if (processBidirectionalText && logicalInput.sections.length === 1) {
         // Bidi doesn't have to be style-aware
-        lines = [];
-        const untaggedLines =
-            processBidirectionalText(logicalInput.toString(),
-                                     determineLineBreaks(logicalInput, spacing, maxWidth, glyphMap, imagePositions, symbolPlacement, layoutTextSize));
+        const untaggedLines = processBidirectionalText(logicalInput.toString(), lineBreaks);
         for (const line of untaggedLines) {
             const taggedLine = new TaggedString();
             taggedLine.text = line;
@@ -283,13 +286,8 @@ function shapeText(text: Formatted,
             lines.push(taggedLine);
         }
     } else if (processStyledBidirectionalText) {
-        // Need version of mapbox-gl-rtl-text with style support for combining RTL text
-        // with formatting
-        lines = [];
-        const processedLines =
-            processStyledBidirectionalText(logicalInput.text,
-                                           logicalInput.sectionIndex,
-                                           determineLineBreaks(logicalInput, spacing, maxWidth, glyphMap, imagePositions, symbolPlacement, layoutTextSize));
+        // Need version of mapbox-gl-rtl-text with style support for combining RTL text with formatting
+        const processedLines = processStyledBidirectionalText(logicalInput.text, logicalInput.sectionIndex, lineBreaks);
         for (const line of processedLines) {
             const taggedLine = new TaggedString();
             taggedLine.text = line[0];
@@ -298,7 +296,7 @@ function shapeText(text: Formatted,
             lines.push(taggedLine);
         }
     } else {
-        lines = breakLines(logicalInput, determineLineBreaks(logicalInput, spacing, maxWidth, glyphMap, imagePositions, symbolPlacement, layoutTextSize));
+        lines = breakLines(logicalInput, lineBreaks);
     }
 
     const positionedLines = [];
@@ -480,11 +478,7 @@ function determineLineBreaks(logicalInput: TaggedString,
                              maxWidth: number,
                              glyphMap: {[_: string]: {glyphs: {[_: number]: ?StyleGlyph}, ascender?: number, descender?: number}},
                              imagePositions: {[_: string]: ImagePosition},
-                             symbolPlacement: string,
                              layoutTextSize: number): Array<number> {
-    if (symbolPlacement !== 'point')
-        return [];
-
     if (!logicalInput)
         return [];
 
@@ -528,7 +522,7 @@ function determineLineBreaks(logicalInput: TaggedString,
             true));
 }
 
-function getAnchorAlignment(anchor: SymbolAnchor) {
+function getAnchorAlignment(anchor: SymbolAnchor): AnchorAlignment {
     let horizontalAlign = 0.5, verticalAlign = 0.5;
 
     switch (anchor) {

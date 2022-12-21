@@ -8,7 +8,7 @@ import window from '../../../src/util/window.js';
 function createSource(options) {
     window.useFakeHTMLCanvasGetContext();
 
-    const c = options && options.canvas || window.document.createElement('canvas');
+    const c = (options && options.canvas) || window.document.createElement('canvas');
     c.width = 20;
     c.height = 20;
 
@@ -37,9 +37,8 @@ class StubMap extends Evented {
 }
 
 test('CanvasSource', (t) => {
-    t.afterEach((callback) => {
+    t.afterEach(() => {
         window.restore();
-        callback();
     });
 
     t.test('constructor', (t) => {
@@ -140,7 +139,7 @@ test('CanvasSource', (t) => {
 
         source.onAdd(map);
 
-        t.equal(source.hasTransition(), true, 'should animate initally');
+        t.equal(source.hasTransition(), true, 'should animate initially');
 
         source.onRemove();
 

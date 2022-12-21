@@ -13,13 +13,15 @@ import replace from '@rollup/plugin-replace';
 // Common set of plugins/transformations shared across different rollup
 // builds (main mapboxgl bundle, style-spec package, benchmarks bundle)
 
-export const plugins = (minified, production, test, bench) => [
+export const plugins = ({minified, production, test, bench, keepClassNames}) => [
     flow(),
     minifyStyleSpec(),
-    json(),
-    production ? strip({
+    json({
+        exclude: 'src/style-spec/reference/v8.json'
+    }),
+    (production && !bench) ? strip({
         sourceMap: true,
-        functions: ['PerformanceUtils.*', 'WorkerPerformanceUtils.*', 'Debug.*']
+        functions: ['PerformanceUtils.*', 'WorkerPerformanceUtils.*', 'Debug.*', 'performance.mark']
     }) : false,
     production || bench ? unassert() : false,
     test ? replace({
@@ -31,7 +33,8 @@ export const plugins = (minified, production, test, bench) => [
         compress: {
             pure_getters: true,
             passes: 3
-        }
+        },
+        keep_classnames: keepClassNames
     }) : false,
     resolve({
         browser: true,
@@ -69,7 +72,7 @@ function glsl(include, minify) {
                 code = code.trim() // strip whitespace at the start/end
                     .replace(/\s*\/\/[^\n]*\n/g, '\n') // strip double-slash comments
                     .replace(/\n+/g, '\n') // collapse multi line breaks
-                    .replace(/\n\s+/g, '\n') // strip identation
+                    .replace(/\n\s+/g, '\n') // strip indentation
                     .replace(/\s?([+-\/*=,])\s?/g, '$1') // strip whitespace around operators
                     .replace(/([;,\{\}])\n(?=[^#])/g, '$1'); // strip more line breaks
             }

@@ -12,8 +12,8 @@ import type Map from './map.js';
  *
  * @returns {Hash} `this`
  */
-class Hash {
-    _map: Map;
+export default class Hash {
+    _map: ?Map;
     _updateHash: () => ?TimeoutID;
     _hashName: ?string;
 
@@ -35,10 +35,10 @@ class Hash {
      * @param {Object} map
      * @returns {Hash} `this`
      */
-    addTo(map: Map) {
+    addTo(map: Map): this {
         this._map = map;
         window.addEventListener('hashchange', this._onHashChange, false);
-        this._map.on('moveend', this._updateHash);
+        map.on('moveend', this._updateHash);
         return this;
     }
 
@@ -47,36 +47,22 @@ class Hash {
      *
      * @returns {Popup} `this`
      */
-    remove() {
-        window.removeEventListener('hashchange', this._onHashChange, false);
+    remove(): this {
+        if (!this._map) return this;
+
         this._map.off('moveend', this._updateHash);
+        window.removeEventListener('hashchange', this._onHashChange, false);
         clearTimeout(this._updateHash());
 
-        delete this._map;
+        this._map = undefined;
         return this;
     }
 
-    getHashString(mapFeedback?: boolean) {
-        const center = this._map.getCenter(),
-            zoom = Math.round(this._map.getZoom() * 100) / 100,
-            // derived from equation: 512px * 2^z / 360 / 10^d < 0.5px
-            precision = Math.ceil((zoom * Math.LN2 + Math.log(512 / 360 / 0.5)) / Math.LN10),
-            m = Math.pow(10, precision),
-            lng = Math.round(center.lng * m) / m,
-            lat = Math.round(center.lat * m) / m,
-            bearing = this._map.getBearing(),
-            pitch = this._map.getPitch();
-        let hash = '';
-        if (mapFeedback) {
-            // new map feedback site has some constraints that don't allow
-            // us to use the same hash format as we do for the Map hash option.
-            hash += `/${lng}/${lat}/${zoom}`;
-        } else {
-            hash += `${zoom}/${lat}/${lng}`;
-        }
+    getHashString(): string {
+        const map = this._map;
+        if (!map) return '';
 
-        if (bearing || pitch) hash += (`/${Math.round(bearing * 10) / 10}`);
-        if (pitch) hash += (`/${Math.round(pitch)}`);
+        const hash = getHashString(map);
 
         if (this._hashName) {
             const hashName = this._hashName;
@@ -98,7 +84,7 @@ class Hash {
         return `#${hash}`;
     }
 
-    _getCurrentHash() {
+    _getCurrentHash(): Array<string> {
         // Get the current hash from location, stripped from its number sign
         const hash = window.location.hash.replace('#', '');
         if (this._hashName) {
@@ -116,11 +102,13 @@ class Hash {
         return hash.split('/');
     }
 
-    _onHashChange() {
+    _onHashChange(): boolean {
+        const map = this._map;
+        if (!map) return false;
         const loc = this._getCurrentHash();
         if (loc.length >= 3 && !loc.some(v => isNaN(v))) {
-            const bearing = this._map.dragRotate.isEnabled() && this._map.touchZoomRotate.isEnabled() ? +(loc[3] || 0) : this._map.getBearing();
-            this._map.jumpTo({
+            const bearing = map.dragRotate.isEnabled() && map.touchZoomRotate.isEnabled() ? +(loc[3] || 0) : map.getBearing();
+            map.jumpTo({
                 center: [+loc[2], +loc[1]],
                 zoom: +loc[0],
                 bearing,
@@ -136,7 +124,25 @@ class Hash {
         const location = window.location.href.replace(/(#.+)?$/, this.getHashString());
         window.history.replaceState(window.history.state, null, location);
     }
-
 }
 
-export default Hash;
+export function getHashString(map: Map, mapFeedback?: boolean): string {
+    const center = map.getCenter(),
+        zoom = Math.round(map.getZoom() * 100) / 100,
+        // derived from equation: 512px * 2^z / 360 / 10^d < 0.5px
+        precision = Math.ceil((zoom * Math.LN2 + Math.log(512 / 360 / 0.5)) / Math.LN10),
+        m = Math.pow(10, precision),
+        lng = Math.round(center.lng * m) / m,
+        lat = Math.round(center.lat * m) / m,
+        bearing = map.getBearing(),
+        pitch = map.getPitch();
+
+    // new map feedback site has some constraints that don't allow
+    // us to use the same hash format as we do for the Map hash option.
+    let hash = mapFeedback ? `/${lng}/${lat}/${zoom}` : `${zoom}/${lat}/${lng}`;
+
+    if (bearing || pitch) hash += (`/${Math.round(bearing * 10) / 10}`);
+    if (pitch) hash += (`/${Math.round(pitch)}`);
+
+    return hash;
+}

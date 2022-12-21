@@ -2,6 +2,28 @@
 #define ELEVATION_SCALE 7.0
 #define ELEVATION_OFFSET 450.0
 
+#ifdef PROJECTION_GLOBE_VIEW
+
+uniform vec3 u_tile_tl_up;
+uniform vec3 u_tile_tr_up;
+uniform vec3 u_tile_br_up;
+uniform vec3 u_tile_bl_up;
+uniform float u_tile_up_scale;
+vec3 elevationVector(vec2 pos) {
+    vec2 uv = pos / EXTENT;
+    vec3 up = normalize(mix(
+        mix(u_tile_tl_up, u_tile_tr_up, uv.xxx),
+        mix(u_tile_bl_up, u_tile_br_up, uv.xxx),
+        uv.yyy));
+    return up * u_tile_up_scale;
+}
+
+#else
+
+vec3 elevationVector(vec2 pos) { return vec3(0, 0, 1); }
+
+#endif
+
 #ifdef TERRAIN
 
 #ifdef TERRAIN_DEM_FLOAT_FORMAT
@@ -78,21 +100,28 @@ float prevElevation(vec2 apos) {
 
 #ifdef TERRAIN_VERTEX_MORPHING
 float elevation(vec2 apos) {
+    #ifdef ZERO_EXAGGERATION
+        return 0.0;
+    #endif
     float nextElevation = currentElevation(apos);
     float prevElevation = prevElevation(apos);
     return mix(prevElevation, nextElevation, u_dem_lerp);
 }
 #else
 float elevation(vec2 apos) {
+    #ifdef ZERO_EXAGGERATION
+        return 0.0;
+    #endif
     return currentElevation(apos);
 }
 #endif
 
 // Unpack depth from RGBA. A piece of code copied in various libraries and WebGL
 // shadow mapping examples.
-float unpack_depth(vec4 rgba_depth)
+// https://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
+highp float unpack_depth(highp vec4 rgba_depth)
 {
-    const vec4 bit_shift = vec4(1.0 / (256.0 * 256.0 * 256.0), 1.0 / (256.0 * 256.0), 1.0 / 256.0, 1.0);
+    const highp vec4 bit_shift = vec4(1.0 / (255.0 * 255.0 * 255.0), 1.0 / (255.0 * 255.0), 1.0 / 255.0, 1.0);
     return dot(rgba_depth, bit_shift) * 2.0 - 1.0;
 }
 
@@ -157,7 +186,6 @@ float flatElevation(vec2 pack) {
 
     vec2 w = floor(0.5 * (span * u_meter_to_dem - 1.0));
     vec2 d = dd * w;
-    vec4 bounds = vec4(d, vec2(1.0) - d);
 
     // Get building wide sample, to get better slope estimate.
     h = fourSample(pos - d, 2.0 * d + vec2(dd));

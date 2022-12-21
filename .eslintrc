@@ -8,8 +8,11 @@
   "parserOptions": {
     "sourceType": "module",
     "requireConfigFile": false,
+    "ecmaVersion": 2016,
     "babelOptions": {
-      "presets": ["@babel/preset-flow"]
+      "parserOpts": {
+        "plugins": ["flow"]
+      }
     }
   },
   "plugins": [
@@ -59,6 +62,7 @@
     "no-new": "off",
     "no-unused-vars": ["error", {"argsIgnorePattern": "^_$"}],
     "no-warning-comments": "error",
+    "no-mixed-operators": ["error", {"groups": [["&", "|", "^", "~", "<<", ">>", ">>>"], ["&&", "||"]]}],
     "object-curly-spacing": ["error", "never"],
     "prefer-arrow-callback": "error",
     "prefer-const": ["error", {"destructuring": "all"}],

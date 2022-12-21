@@ -9,13 +9,15 @@
 import jsdom from 'jsdom';
 
 import gl from 'gl';
+/*eslint-disable import/no-named-as-default-member */
 import sinon from 'sinon';
 
 import type {Window} from '../types/window.js';
+import type {JSDOM} from 'jsdom';
 
-const {window: _window} = new jsdom.JSDOM('', {
+const {window: _window} = (new jsdom.JSDOM('', {
     virtualConsole: new jsdom.VirtualConsole().sendTo(console)
-});
+}): JSDOM);
 
 restore();
 
@@ -88,6 +90,7 @@ function restore(): Window {
     window.restore = restore;
 
     window.performance.getEntriesByName = function() {};
+    window.performance.getEntriesByType = function() {};
     window.performance.mark = function() {};
     window.performance.measure = function() {};
     window.performance.clearMarks = function() {};

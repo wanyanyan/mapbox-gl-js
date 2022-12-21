@@ -1,10 +1,12 @@
 // @flow
 
-import DOM from '../../util/dom.js';
+import * as DOM from '../../util/dom.js';
 
 import {Event} from '../../util/evented.js';
 
 import type Map from '../map.js';
+import type Point from '@mapbox/point-geometry';
+import type {HandlerResult} from '../handler_manager.js';
 
 /**
  * The `BoxZoomHandler` allows the user to zoom the map to fit within a bounding box.
@@ -19,8 +21,8 @@ class BoxZoomHandler {
     _container: HTMLElement;
     _enabled: boolean;
     _active: boolean;
-    _startPos: Point;
-    _lastPos: Point;
+    _startPos: ?Point;
+    _lastPos: ?Point;
     _box: HTMLElement;
     _clickTolerance: number;
 
@@ -43,7 +45,7 @@ class BoxZoomHandler {
      * @example
      * const isBoxZoomEnabled = map.boxZoom.isEnabled();
      */
-    isEnabled() {
+    isEnabled(): boolean {
         return !!this._enabled;
     }
 
@@ -54,7 +56,7 @@ class BoxZoomHandler {
      * @example
      * const isBoxZoomActive = map.boxZoom.isActive();
      */
-    isActive() {
+    isActive(): boolean {
         return !!this._active;
     }
 
@@ -93,12 +95,13 @@ class BoxZoomHandler {
         if (!this._active) return;
 
         const pos = point;
+        const p0 = this._startPos;
+        const p1 = this._lastPos;
 
-        if (this._lastPos.equals(pos) || (!this._box && pos.dist(this._startPos) < this._clickTolerance)) {
+        if (!p0 || !p1 || p1.equals(pos) || (!this._box && pos.dist(p0) < this._clickTolerance)) {
             return;
         }
 
-        const p0 = this._startPos;
         this._lastPos = pos;
 
         if (!this._box) {
@@ -114,21 +117,20 @@ class BoxZoomHandler {
 
         this._map._requestDomTask(() => {
             if (this._box) {
-                DOM.setTransform(this._box, `translate(${minX}px,${minY}px)`);
-
+                this._box.style.transform = `translate(${minX}px,${minY}px)`;
                 this._box.style.width = `${maxX - minX}px`;
                 this._box.style.height = `${maxY - minY}px`;
             }
         });
     }
 
-    mouseupWindow(e: MouseEvent, point: Point) {
+    mouseupWindow(e: MouseEvent, point: Point): ?HandlerResult {
         if (!this._active) return;
-
-        if (e.button !== 0) return;
 
         const p0 = this._startPos,
             p1 = point;
+
+        if (!p0 || e.button !== 0) return;
 
         this.reset();
 
@@ -139,7 +141,7 @@ class BoxZoomHandler {
         } else {
             this._map.fire(new Event('boxzoomend', {originalEvent: e}));
             return {
-                cameraAnimation: map => map.fitScreenCoordinates(p0, p1, this._map.getBearing(), {linear: false})
+                cameraAnimation: (map: Map) => map.fitScreenCoordinates(p0, p1, this._map.getBearing(), {linear: false})
             };
         }
     }
@@ -153,13 +155,17 @@ class BoxZoomHandler {
         }
     }
 
+    blur() {
+        this.reset();
+    }
+
     reset() {
         this._active = false;
 
         this._container.classList.remove('mapboxgl-crosshair');
 
         if (this._box) {
-            DOM.remove(this._box);
+            this._box.remove();
             this._box = (null: any);
         }
 
@@ -169,7 +175,7 @@ class BoxZoomHandler {
         delete this._lastPos;
     }
 
-    _fireEvent(type: string, e: *) {
+    _fireEvent(type: string, e: *): Map {
         return this._map.fire(new Event(type, {originalEvent: e}));
     }
 }

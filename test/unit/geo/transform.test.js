@@ -5,10 +5,10 @@ import LngLat from '../../../src/geo/lng_lat.js';
 import {OverscaledTileID, CanonicalTileID} from '../../../src/source/tile_id.js';
 import {fixedNum, fixedLngLat, fixedCoord, fixedPoint, fixedVec3, fixedVec4} from '../../util/fixed.js';
 import {FreeCameraOptions} from '../../../src/ui/free_camera.js';
-import MercatorCoordinate, {mercatorZfromAltitude} from '../../../src/geo/mercator_coordinate.js';
+import MercatorCoordinate, {mercatorZfromAltitude, altitudeFromMercatorZ, MAX_MERCATOR_LATITUDE} from '../../../src/geo/mercator_coordinate.js';
 import {vec3, quat} from 'gl-matrix';
 import LngLatBounds from '../../../src/geo/lng_lat_bounds.js';
-import {degToRad} from '../../../src/util/util.js';
+import {degToRad, radToDeg} from '../../../src/util/util.js';
 
 test('transform', (t) => {
 
@@ -16,7 +16,6 @@ test('transform', (t) => {
         const transform = new Transform();
         transform.resize(500, 500);
         t.equal(transform.unmodified, true);
-        t.equal(transform.maxValidLatitude, 85.051129);
         t.equal(transform.tileSize, 512, 'tileSize');
         t.equal(transform.worldSize, 512, 'worldSize');
         t.equal(transform.width, 500, 'width');
@@ -89,21 +88,18 @@ test('transform', (t) => {
     t.test('set fov', (t) => {
         const transform = new Transform();
         transform.fov = 10;
-        t.equal(transform.fov, 10);
+        t.equal(radToDeg(transform._fov), 10);
         transform.fov = 10;
-        t.equal(transform.fov, 10);
+        t.equal(radToDeg(transform._fov), 10);
         t.end();
     });
 
-    t.test('lngRange & latRange constrain zoom and center', (t) => {
+    t.test('maxBounds constrain zoom and center', (t) => {
         const transform = new Transform();
         transform.center = new LngLat(0, 0);
         transform.zoom = 10;
         transform.resize(500, 500);
-
-        transform.lngRange = [-5, 5];
-        transform.latRange = [-5, 5];
-
+        transform.setMaxBounds(LngLatBounds.convert([-5, -5, 5, 5]));
         transform.zoom = 0;
         t.equal(transform.zoom, 5.135709286104402);
 
@@ -117,8 +113,110 @@ test('transform', (t) => {
         t.end();
     });
 
-    t.test('_minZoomForBounds respects latRange and lngRange', (t) => {
-        t.test('it returns 0 when latRange and lngRange are undefined', (t) => {
+    t.test('maxBounds should not jump to the wrong side when crossing 180th meridian (#10447)', (t) => {
+        t.test(' to the East', (t) => {
+            const transform = new Transform();
+            transform.zoom = 6;
+            transform.resize(500, 500);
+            transform.setMaxBounds(LngLatBounds.convert([160, -55, 190, -23]));
+
+            transform.center = new LngLat(-170, -40);
+
+            t.ok(transform.center.lng < 190);
+            t.ok(transform.center.lng > 175);
+
+            t.end();
+        });
+
+        t.test('to the West', (t) => {
+            const transform = new Transform();
+            transform.zoom = 6;
+            transform.resize(500, 500);
+            transform.setMaxBounds(LngLatBounds.convert([-190, -55, -160, -23]));
+
+            transform.center = new LngLat(170, -40);
+
+            t.ok(transform.center.lng > -190);
+            t.ok(transform.center.lng < -175);
+
+            t.end();
+        });
+
+        t.test('longitude 0 - 360', (t) => {
+            const transform = new Transform();
+            transform.zoom = 6;
+            transform.resize(500, 500);
+            transform.setMaxBounds(LngLatBounds.convert([0, -90, 360, 90]));
+
+            transform.center = new LngLat(-155, 0);
+
+            t.same(transform.center, new LngLat(205, 0));
+
+            t.end();
+        });
+
+        t.test('longitude -360 - 0', (t) => {
+            const transform = new Transform();
+            transform.zoom = 6;
+            transform.resize(500, 500);
+            transform.setMaxBounds(LngLatBounds.convert([-360, -90, 0, 90]));
+
+            transform.center = new LngLat(160, 0);
+            t.same(transform.center.lng.toFixed(10), -200);
+
+            t.end();
+        });
+
+        t.end();
+
+    });
+
+    t.test('maxBounds snaps in the correct direction (no forcing to other edge when width < 360)', (t) => {
+        const transform = new Transform();
+        transform.zoom = 6;
+        transform.resize(500, 500);
+        transform.setMaxBounds(new LngLatBounds([-160, -20], [160, 20]));
+
+        transform.center = new LngLat(170, 0);
+        t.ok(transform.center.lng > 150);
+        t.ok(transform.center.lng < 160);
+
+        transform.center = new LngLat(-170, 0);
+        t.ok(transform.center.lng > -160);
+        t.ok(transform.center.lng < -150);
+
+        t.end();
+    });
+
+    t.test('maxBounds works with unwrapped values across the 180th meridian (#6985)', (t) => {
+        const transform = new Transform();
+        transform.zoom = 6;
+        transform.resize(500, 500);
+        transform.setMaxBounds(new LngLatBounds([160, -20], [-160, 20]));  //East bound is "smaller"
+
+        const wrap = val => ((val + 360) % 360);
+
+        transform.center = new LngLat(170, 0);
+        t.same(wrap(transform.center.lng), 170);
+
+        transform.center = new LngLat(-170, 0);
+        t.same(wrap(transform.center.lng), wrap(-170));
+
+        transform.center = new LngLat(150, 0);
+        let lng = wrap(transform.center.lng);
+        t.ok(lng > 160);
+        t.ok(lng < 180);
+
+        transform.center = new LngLat(-150, 0);
+        lng = wrap(transform.center.lng);
+        t.ok(lng < 360 - 160);
+        t.ok(lng > 360 - 180);
+
+        t.end();
+    });
+
+    t.test('_minZoomForBounds respects maxBounds', (t) => {
+        t.test('it returns 0 when lngRange is undefined', (t) => {
             const transform = new Transform();
             transform.center = new LngLat(0, 0);
             transform.zoom = 10;
@@ -133,8 +231,7 @@ test('transform', (t) => {
             transform.center = new LngLat(0, 0);
             transform.zoom = 10;
             transform.resize(500, 500);
-            transform.lngRange = [-5, 5];
-            transform.latRange = [-5, 5];
+            transform.setMaxBounds(LngLatBounds.convert([-5, -5, 5, 5]));
 
             const preComputedMinZoom = transform._minZoomForBounds();
             transform.zoom = 0;
@@ -229,6 +326,66 @@ test('transform', (t) => {
         });
 
         t.end();
+    });
+
+    t.test('getBounds (#10261)', (t) => {
+        const transform = new Transform();
+        transform.resize(500, 500);
+        transform.zoom = 2;
+        transform.pitch = 80;
+
+        t.test('Looking at North Pole', (t) => {
+            transform.center = {lng: 0, lat: 90};
+            t.deepEqual(transform.center, {lng: 0, lat: 79.3677012485858});
+            const bounds = transform.getBounds();
+
+            // Bounds stops at the edge of the map
+            t.same(bounds.getNorth().toFixed(6), MAX_MERCATOR_LATITUDE);
+            // Top corners of bounds line up with side of view
+            t.same(transform.locationPoint(bounds.getNorthWest()).x.toFixed(10), 0);
+            t.same(transform.locationPoint(bounds.getNorthEast()).x.toFixed(10), transform.width);
+            // Bottom of bounds lines up with bottom of view
+            t.same(transform.locationPoint(bounds.getSouthEast()).y.toFixed(10), transform.height);
+            t.same(transform.locationPoint(bounds.getSouthWest()).y.toFixed(10), transform.height);
+
+            t.same(toFixed(bounds.toArray()), toFixed([[ -56.6312307639145, 62.350646608460806 ], [ 56.63123076391412, 85.0511287798 ]]));
+
+            t.end();
+        });
+        t.test('Looking at South Pole', (t) => {
+            transform.bearing = 180;
+            transform.center = {lng: 0, lat: -90};
+
+            t.deepEqual(transform.center, {lng: 0, lat: -79.3677012485858});
+            const bounds = transform.getBounds();
+
+            // Bounds stops at the edge of the map
+            t.same(bounds.getSouth().toFixed(6), -MAX_MERCATOR_LATITUDE);
+            // Top corners of bounds line up with side of view
+            t.same(transform.locationPoint(bounds.getSouthEast()).x.toFixed(10), 0);
+            t.same(transform.locationPoint(bounds.getSouthWest()).x.toFixed(10), transform.width);
+            // Bottom of bounds lines up with bottom of view
+            t.same(transform.locationPoint(bounds.getNorthEast()).y.toFixed(10), transform.height);
+            t.same(transform.locationPoint(bounds.getNorthWest()).y.toFixed(10), transform.height);
+
+            t.same(toFixed(bounds.toArray()), toFixed([[ -56.6312307639145, -85.0511287798], [ 56.63123076391412, -62.350646608460806]]));
+
+            t.end();
+        });
+        t.end();
+
+        function toFixed(bounds) {
+            const n = 10;
+            return [
+                [normalizeFixed(bounds[0][0], n), normalizeFixed(bounds[0][1], n)],
+                [normalizeFixed(bounds[1][0], n), normalizeFixed(bounds[1][1], n)]
+            ];
+        }
+
+        function normalizeFixed(num, n) {
+            // workaround for "-0.0000000000" ≠ "0.0000000000"
+            return parseFloat(num.toFixed(n)).toFixed(n);
+        }
     });
 
     test('coveringTiles', (t) => {
@@ -466,40 +623,85 @@ test('transform', (t) => {
 
     const createCollisionElevation = (elevation) => {
         return {
+            isDataAvailableAtPoint(_) {
+                return true;
+            },
             getAtPointOrZero(p) {
                 if (p.x === 0.5 && p.y === 0.5)
                     return 0;
-                return elevation;
+                return elevation * this.exaggeration();
+            },
+            getAtPoint(p) {
+                return this.getAtPointOrZero(p);
             },
             getForTilePoints(tileID, points) {
                 for (const p of points) {
-                    p[2] = elevation;
+                    p[2] = elevation * this.exaggeration();
                 }
                 return true;
             },
-            getMinElevationBelowMSL: () => 0
+            getMinElevationBelowMSL: () => 0,
+            _exaggeration: 1,
+            exaggeration() {
+                return this._exaggeration;
+            }
+        };
+    };
+
+    const createCollisionElevationNoData = () => {
+        return {
+            isDataAvailableAtPoint(_) {
+                return false;
+            },
+            getAtPointOrZero() {
+                return 0.0;
+            },
+            getAtPoint(p) {
+                return this.getAtPointOrZero(p);
+            },
+            getForTilePoints() {
+                return true;
+            },
+            getMinElevationBelowMSL: () => 0,
+            exaggeration: () => 1
         };
     };
 
     const createConstantElevation = (elevation) => {
         return {
+            isDataAvailableAtPoint(_) {
+                return true;
+            },
             getAtPointOrZero(_) {
-                return elevation;
+                return elevation * this.exaggeration();
+            },
+            getAtPoint(_) {
+                return this.getAtPointOrZero();
             },
             getForTilePoints(tileID, points) {
                 for (const p of points) {
-                    p[2] = elevation;
+                    p[2] = elevation * this.exaggeration();
                 }
                 return true;
             },
-            getMinElevationBelowMSL: () => 0
+            getMinElevationBelowMSL: () => 0,
+            _exaggeration: 1,
+            exaggeration() {
+                return this._exaggeration;
+            }
         };
     };
 
     const createRampElevation = (scale) => {
         return {
+            isDataAvailableAtPoint(_) {
+                return true;
+            },
             getAtPointOrZero(p) {
                 return scale * (p.x + p.y - 1.0);
+            },
+            getAtPoint(p) {
+                return this.getAtPointOrZero(p);
             },
             getForTilePoints(tileID, points) {
                 for (const p of points) {
@@ -507,16 +709,64 @@ test('transform', (t) => {
                 }
                 return true;
             },
-            getMinElevationBelowMSL: () => 0
+            getMinElevationBelowMSL: () => 0,
+            exaggeration: () => 1
         };
     };
 
-    test('Constrained camera height over terrain', (t) => {
+    test('Pitch does not change when camera collides with terrain', (t) => {
         const transform = new Transform();
         transform.resize(200, 200);
         transform.maxPitch = 85;
 
-        transform.elevation = createCollisionElevation(10);
+        transform._elevation = createCollisionElevation(10);
+        transform.bearing = -45;
+        transform.pitch = 85;
+
+        const altitudeZ = mercatorZfromAltitude(5, transform.center.lat) / Math.cos(degToRad(85));
+        const zoom = transform._zoomFromMercatorZ(altitudeZ * 2);
+        transform.zoom = zoom;
+
+        const cameraAltitude = transform.getFreeCameraOptions().position.z / mercatorZfromAltitude(1, transform.center.lat);
+        t.ok(cameraAltitude > 10);
+        t.equal(fixedNum(transform.bearing), -45);
+        t.equal(fixedNum(transform.pitch), 85);
+
+        t.end();
+    });
+
+    test('Camera height is above terrain with constant elevation', (t) => {
+        const transform = new Transform();
+        transform.resize(200, 200);
+        transform.maxPitch = 85;
+
+        transform.elevation = createConstantElevation(10);
+        transform.bearing = -45;
+        transform.pitch = 85;
+
+        // Set camera altitude to 5 meters
+        const altitudeZ = mercatorZfromAltitude(5, transform.center.lat) / Math.cos(degToRad(85));
+        const zoom = transform._zoomFromMercatorZ(altitudeZ);
+        transform.zoom = zoom;
+
+        const cameraAltitude = altitudeFromMercatorZ(transform.getFreeCameraOptions().position.z, transform.getFreeCameraOptions().position.y);
+
+        t.ok(cameraAltitude > 10);
+        t.equal(fixedNum(transform.zoom), fixedNum(zoom));
+        t.equal(fixedNum(transform.bearing), -45);
+        t.equal(fixedNum(transform.pitch), 85);
+
+        t.end();
+    });
+
+    test('Constrained camera height over terrain with exaggeration change', (t) => {
+        const transform = new Transform();
+        transform.resize(200, 200);
+        transform.maxPitch = 85;
+
+        const elevation = createConstantElevation(10);
+        elevation._exaggeration = 0;
+        transform.elevation = elevation;
         transform.constantCameraHeight = false;
         transform.bearing = -45;
         transform.pitch = 85;
@@ -526,13 +776,77 @@ test('transform', (t) => {
         const zoom = transform._zoomFromMercatorZ(altitudeZ);
         transform.zoom = zoom;
 
-        // Pitch should have been adjusted so that the camera isn't under the terrain
-        const pixelsPerMeter = mercatorZfromAltitude(1, transform.center.lat) * transform.worldSize;
-        const updatedAltitude = transform.cameraToCenterDistance / pixelsPerMeter * Math.cos(degToRad(transform.pitch));
+        const cameraAltitude = () => {
+            return transform.getFreeCameraOptions().position.z / mercatorZfromAltitude(1, transform.center.lat);
+        };
 
-        t.true(updatedAltitude > 10);
-        t.equal(fixedNum(transform.zoom), fixedNum(zoom));
-        t.equal(fixedNum(transform.bearing), -45);
+        t.equal(fixedNum(cameraAltitude()), 5);
+        t.equal(transform._centerAltitude, 0);
+
+        // increase exaggeration to lift the center (and camera that follows it) up.
+        transform.elevation._exaggeration = 1;
+        transform.updateElevation(false);
+        t.equal(transform._centerAltitude, 10);
+
+        const cameraAltitudeAfterLift = cameraAltitude();
+        t.equal(fixedNum(cameraAltitudeAfterLift), 15);
+
+        transform.elevation._exaggeration = 15;
+        transform.updateElevation(false);
+        t.equal(transform._centerAltitude, 150);
+        t.equal(fixedNum(cameraAltitude()), 155);
+
+        transform.elevation._exaggeration = 0;
+        transform.updateElevation(false);
+        t.equal(fixedNum(cameraAltitude()), 5);
+
+        // zoom out to 10 meters and back to 5
+        transform.zoom = transform._zoomFromMercatorZ(altitudeZ * 2);
+        t.equal(fixedNum(cameraAltitude()), 10);
+        transform.zoom = zoom;
+        t.equal(fixedNum(cameraAltitude()), 5);
+        t.equal(fixedNum(transform.pitch), 85);
+
+        transform.elevation = null;
+        t.ok(cameraAltitude() < 10);
+
+        // collision elevation keeps center at 0 but pushes camera up.
+        const elevation1 = createCollisionElevation(10);
+        elevation1._exaggeration = 0;
+
+        transform.elevation = elevation1;
+        transform.updateElevation(false);
+        t.equal(transform._centerAltitude, 0);
+        t.ok(cameraAltitude() < 10);
+
+        elevation1._exaggeration = 1;
+        transform.updateElevation(false);
+        t.equal(transform._centerAltitude, 0);
+        t.ok(cameraAltitude() > 10);
+        t.equal(fixedNum(transform.pitch), 85);
+
+        t.end();
+    });
+
+    t.test('Constrained camera height over terrain without data', t => {
+        const transform = new Transform();
+        transform.resize(200, 200);
+
+        transform.elevation = createCollisionElevationNoData();
+
+        t.equal(transform._centerAltitudeValidForExaggeration, undefined);
+
+        const transformBefore = transform.clone();
+
+        // Set camera altitude to 5 meters
+        const altitudeZ = mercatorZfromAltitude(5, transform.center.lat) / Math.cos(degToRad(85));
+        const zoom = transform._zoomFromMercatorZ(altitudeZ);
+
+        // Apply zoom
+        transform.zoom = zoom;
+
+        t.equal(transform._centerAltitudeValidForExaggeration, undefined);
+        t.equal(transform._seaLevelZoom, transformBefore._seaLevelZoom);
 
         t.end();
     });
@@ -546,7 +860,7 @@ test('transform', (t) => {
         t.equal(transform.elevation.getAtPointOrZero(new MercatorCoordinate(1.0, 0.5)), 250);
 
         t.equal(transform.zoom, 16);
-        t.equal(transform._cameraZoom, 16);
+        t.equal(transform._seaLevelZoom, 16);
 
         // zoom should remain unchanged
         transform.cameraElevationReference = "ground";
@@ -559,9 +873,9 @@ test('transform', (t) => {
         // zoom should change so that the altitude remains constant
         transform.cameraElevationReference = "sea";
         transform.center = new LngLat(180, 0);
-        t.equal(transform._cameraZoom, 16);
+        t.equal(transform._seaLevelZoom, 16);
 
-        const altitudeZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform._cameraZoom) * transform.tileSize);
+        const altitudeZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform._seaLevelZoom) * transform.tileSize);
         const heightZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform.zoom) * transform.tileSize);
         const elevationZ = mercatorZfromAltitude(250, 0);
         t.equal(fixedNum(elevationZ + heightZ), fixedNum(altitudeZ));
@@ -576,20 +890,20 @@ test('transform', (t) => {
         transform.zoom = 16;
 
         transform.elevation = createConstantElevation(0);
-        t.equal(transform.zoom, transform._cameraZoom);
+        t.equal(transform.zoom, transform._seaLevelZoom);
 
         // Camera zoom should change so that the standard zoom value describes distance between the camera and the terrain
         transform.elevation = createConstantElevation(10000);
-        t.equal(fixedNum(transform._cameraZoom), 11.1449615644);
+        t.equal(fixedNum(transform._seaLevelZoom), 11.1449615644);
 
         // Camera height over terrain should remain constant
-        const altitudeZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform._cameraZoom) * transform.tileSize);
+        const altitudeZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform._seaLevelZoom) * transform.tileSize);
         const heightZ = transform.cameraToCenterDistance / (Math.pow(2.0, transform.zoom) * transform.tileSize);
         const elevationZ = mercatorZfromAltitude(10000, 0);
         t.equal(elevationZ + heightZ, altitudeZ);
 
         transform.pitch = 32;
-        t.equal(fixedNum(transform._cameraZoom), 11.1449615644);
+        t.equal(fixedNum(transform._seaLevelZoom), 11.1449615644);
         t.equal(transform.zoom, 16);
 
         t.end();
@@ -607,8 +921,14 @@ test('transform', (t) => {
         let tilesDefaultElevation = 0;
         const tileElevation = {};
         const elevation = {
+            isDataAvailableAtPoint(_) {
+                return true;
+            },
             getAtPointOrZero(_) {
                 return this.exaggeration() * centerElevation;
+            },
+            getAtPoint(_) {
+                return this.getAtPointOrZero();
             },
             getMinMaxForTile(tileID) {
                 const ele = tileElevation[tileID.key] !== undefined ? tileElevation[tileID.key] : tilesDefaultElevation;
@@ -682,8 +1002,8 @@ test('transform', (t) => {
 
         transform.elevation = null;
         transform.elevation = elevation;
-        const cover10k = transform.coveringTiles(options);
 
+        const cover10k = transform.coveringTiles(options);
         t.deepEqual(cover, cover10k);
 
         // Lower tiles on side get clipped.
@@ -765,6 +1085,8 @@ test('transform', (t) => {
             tilesDefaultElevation = null;
             centerElevation = 1600;
             tileElevation[new OverscaledTileID(14, 0, 14, 3413, 6218).key] = 1600;
+            transform.pitch = 0;
+            transform.bearing = 0;
             transform.resize(768, 768);
             transform.zoom = options.maxzoom = 22;
             transform.center = {lng: -104.99813327, lat: 39.72784465999999};
@@ -806,8 +1128,14 @@ test('transform', (t) => {
 
         const transform = new Transform();
         transform.elevation = {
+            isDataAvailableAtPoint(_) {
+                return true;
+            },
             getAtPointOrZero(_) {
                 return 2760;
+            },
+            getAtPoint(_) {
+                return this.getAtPointOrZero();
             },
             getMinMaxForTile(tileID) {
                 for (let z = tileID.canonical.z - 1; z >= 9; z--) {
@@ -832,6 +1160,7 @@ test('transform', (t) => {
         transform.pitch = 62;
 
         const cover = transform.coveringTiles(options);
+
         t.assert(cover.length === 43);
         t.assert(cover.find(tileID => tileID.canonical.z === 13 && tileID.canonical.x === 4270 && tileID.canonical.y === 2927));
         t.assert(cover.find(tileID => tileID.canonical.z === 12 && tileID.canonical.x === 2134 && tileID.canonical.y === 1461));
@@ -901,8 +1230,8 @@ test('transform', (t) => {
     t.test('clamps latitude', (t) => {
         const transform = new Transform();
 
-        t.deepEqual(transform.project(new LngLat(0, -90)), transform.project(new LngLat(0, -transform.maxValidLatitude)));
-        t.deepEqual(transform.project(new LngLat(0, 90)), transform.project(new LngLat(0, transform.maxValidLatitude)));
+        t.deepEqual(transform.project(new LngLat(0, -90)), transform.project(new LngLat(0, -MAX_MERCATOR_LATITUDE)));
+        t.deepEqual(transform.project(new LngLat(0, 90)), transform.project(new LngLat(0, MAX_MERCATOR_LATITUDE)));
         t.end();
     });
 
@@ -940,7 +1269,7 @@ test('transform', (t) => {
 
     t.test('isHorizonVisible', (t) => {
 
-        t.test('isHorizonVisibleForPoints', (t) => {
+        t.test('anyCornerOffEdge', (t) => {
             const transform = new Transform();
             transform.maxPitch = 85;
             transform.resize(800, 800);
@@ -952,21 +1281,21 @@ test('transform', (t) => {
             t.true(transform.isHorizonVisible());
 
             p0 = new Point(0, 0); p1 = new Point(10, 10);
-            t.true(transform.isHorizonVisibleForPoints(p0, p1));
+            t.true(transform.anyCornerOffEdge(p0, p1));
 
             p0 = new Point(0, 250); p1 = new Point(10, 350);
-            t.true(transform.isHorizonVisibleForPoints(p0, p1));
+            t.true(transform.anyCornerOffEdge(p0, p1));
 
             p0 = new Point(0, transform.horizonLineFromTop() - 10);
             p1 = new Point(10, transform.horizonLineFromTop() + 10);
-            t.true(transform.isHorizonVisibleForPoints(p0, p1));
+            t.true(transform.anyCornerOffEdge(p0, p1));
 
             p0 = new Point(0, 700); p1 = new Point(10, 710);
-            t.false(transform.isHorizonVisibleForPoints(p0, p1));
+            t.false(transform.anyCornerOffEdge(p0, p1));
 
             p0 = new Point(0, transform.horizonLineFromTop());
             p1 = new Point(10, transform.horizonLineFromTop() + 10);
-            t.false(transform.isHorizonVisibleForPoints(p0, p1));
+            t.false(transform.anyCornerOffEdge(p0, p1));
 
             t.end();
         });
@@ -1193,7 +1522,7 @@ test('transform', (t) => {
         t.test('clamp to bounds', (t) => {
             const transform = new Transform();
             transform.resize(100, 100);
-            transform.setMaxBounds(new LngLatBounds(new LngLat(-180, -transform.maxValidLatitude), new LngLat(180, transform.maxValidLatitude)));
+            transform.setMaxBounds(new LngLatBounds(new LngLat(-180, -MAX_MERCATOR_LATITUDE), new LngLat(180, MAX_MERCATOR_LATITUDE)));
             transform.zoom = 8.56;
             const options = new FreeCameraOptions();
 
@@ -1296,7 +1625,9 @@ test('transform', (t) => {
             const transform = new Transform(0, 22, 0, 85);
             transform.resize(100, 100);
             transform._elevation = {
+                isDataAvailableAtPoint: () => true,
                 getAtPointOrZero: () => groundElevation,
+                getAtPoint: () => groundElevation,
                 exaggeration: () => 1.0,
                 raycast: () => undefined,
                 getMinElevationBelowMSL: () => 0
@@ -1324,7 +1655,7 @@ test('transform', (t) => {
         });
 
         t.test('_translateCameraConstrained', (t) => {
-            t.test('it clamps at zoom 0 when lngRange and latRange are not defined', (t) => {
+            t.test('it clamps at zoom 0 when maxBounds are not defined', (t) => {
                 const transform = new Transform();
                 transform.center = new LngLat(0, 0);
                 transform.zoom = 10;
@@ -1359,8 +1690,7 @@ test('transform', (t) => {
                 transform.center = new LngLat(0, 0);
                 transform.zoom = 20;
                 transform.resize(500, 500);
-                transform.lngRange = [-5, 5];
-                transform.latRange = [-5, 5];
+                transform.setMaxBounds(LngLatBounds.convert([-5, -5, 5, 5]));
 
                 //record constrained zoom
                 transform.zoom = 0;
@@ -1427,6 +1757,21 @@ test('transform', (t) => {
         t.equal(transform.computeZoomRelativeTo(new MercatorCoordinate(0.5, 0.5, 0.0)), 1);
         t.equal(transform.computeZoomRelativeTo(new MercatorCoordinate(0.5, 0.5, height * 0.25)), 2);
         t.equal(transform.computeZoomRelativeTo(new MercatorCoordinate(0.5, 0.5, height * 0.375)), 3);
+
+        t.end();
+    });
+
+    t.test("setProjection", (t) => {
+        const transform = new Transform();
+        t.equal(transform.getProjection().name, 'mercator');
+
+        // correctly returns indication of whether projection changed
+        t.ok(transform.setProjection({name: 'albers'}));
+        t.notOk(transform.setProjection({name: 'albers'}));
+        t.notOk(transform.setProjection({name: 'albers', center: [-96, 37.5]}));
+        t.ok(transform.setProjection({name: 'albers', center: [-100, 37.5]}));
+        t.ok(transform.setProjection({name: 'mercator'}));
+        t.notOk(transform.setProjection());
 
         t.end();
     });

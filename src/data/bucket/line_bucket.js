@@ -8,14 +8,14 @@ import SegmentVector from '../segment.js';
 import {ProgramConfigurationSet} from '../program_configuration.js';
 import {TriangleIndexArray} from '../index_array_type.js';
 import EXTENT from '../extent.js';
-import mvt from '@mapbox/vector-tile';
-const vectorTileFeatureTypes = mvt.VectorTileFeature.types;
+import {VectorTileFeature} from '@mapbox/vector-tile';
+const vectorTileFeatureTypes = VectorTileFeature.types;
 import {register} from '../../util/web_worker_transfer.js';
 import {hasPattern, addPatternDependencies} from './pattern_bucket_features.js';
 import loadGeometry from '../load_geometry.js';
 import toEvaluationFeature from '../evaluation_feature.js';
 import EvaluationParameters from '../../style/evaluation_parameters.js';
-
+import type {ProjectionSpecification} from '../../style-spec/types.js';
 import type {CanonicalTileID} from '../../source/tile_id.js';
 import type {
     Bucket,
@@ -27,14 +27,15 @@ import type {
 import type LineStyleLayer from '../../style/style_layer/line_style_layer.js';
 import type Point from '@mapbox/point-geometry';
 import type {Segment} from '../segment.js';
-import {RGBAImage} from '../../util/image.js';
+import type {RGBAImage, SpritePositions} from '../../util/image.js';
 import type Context from '../../gl/context.js';
 import type Texture from '../../render/texture.js';
 import type IndexBuffer from '../../gl/index_buffer.js';
 import type VertexBuffer from '../../gl/vertex_buffer.js';
 import type {FeatureStates} from '../../source/source_state.js';
-import type {ImagePosition} from '../../render/image_atlas.js';
 import type LineAtlas from '../../render/line_atlas.js';
+import type {TileTransform} from '../../geo/projection/tile_transform.js';
+import type {IVectorTileLayer} from '@mapbox/vector-tile';
 
 // NOTE ON EXTRUDE SCALE:
 // scale the extrusion vector so that the normal length is this value.
@@ -109,6 +110,7 @@ class LineBucket implements Bucket {
     programConfigurations: ProgramConfigurationSet<LineStyleLayer>;
     segments: SegmentVector;
     uploaded: boolean;
+    projection: ProjectionSpecification;
 
     constructor(options: BucketParameters<LineStyleLayer>) {
         this.zoom = options.zoom;
@@ -116,6 +118,7 @@ class LineBucket implements Bucket {
         this.layers = options.layers;
         this.layerIds = this.layers.map(layer => layer.id);
         this.index = options.index;
+        this.projection = options.projection;
         this.hasPattern = false;
         this.patternFeatures = [];
         this.lineClipsArray = [];
@@ -134,7 +137,7 @@ class LineBucket implements Bucket {
         this.stateDependentLayerIds = this.layers.filter((l) => l.isStateDependent()).map((l) => l.id);
     }
 
-    populate(features: Array<IndexedFeature>, options: PopulateParameters, canonical: CanonicalTileID) {
+    populate(features: Array<IndexedFeature>, options: PopulateParameters, canonical: CanonicalTileID, tileTransform: TileTransform) {
         this.hasPattern = hasPattern('line', this.layers, options);
         const lineSortKey = this.layers[0].layout.get('line-sort-key');
         const bucketFeatures = [];
@@ -155,7 +158,7 @@ class LineBucket implements Bucket {
                 type: feature.type,
                 sourceLayerIndex,
                 index,
-                geometry: needGeometry ? evaluationFeature.geometry : loadGeometry(feature),
+                geometry: needGeometry ? evaluationFeature.geometry : loadGeometry(feature, canonical, tileTransform),
                 patterns: {},
                 sortKey
             };
@@ -187,7 +190,7 @@ class LineBucket implements Bucket {
                 this.patternFeatures.push(patternBucketFeature);
 
             } else {
-                this.addFeature(bucketFeature, geometry, index, canonical, lineAtlas.positions);
+                this.addFeature(bucketFeature, geometry, index, canonical, lineAtlas.positions, options.availableImages);
             }
 
             const feature = features[index].feature;
@@ -195,7 +198,7 @@ class LineBucket implements Bucket {
         }
     }
 
-    addConstantDashes(lineAtlas: LineAtlas) {
+    addConstantDashes(lineAtlas: LineAtlas): boolean {
         let hasFeatureDashes = false;
 
         for (const layer of this.layers) {
@@ -209,9 +212,7 @@ class LineBucket implements Bucket {
                 const constCap = capPropertyValue.value;
                 const constDash = dashPropertyValue.value;
                 if (!constDash) continue;
-                lineAtlas.addDash(constDash.from, constCap);
-                lineAtlas.addDash(constDash.to, constCap);
-                if (constDash.other) lineAtlas.addDash(constDash.other, constCap);
+                lineAtlas.addDash(constDash, constCap);
             }
         }
 
@@ -228,60 +229,47 @@ class LineBucket implements Bucket {
 
             if (dashPropertyValue.kind === 'constant' && capPropertyValue.kind === 'constant') continue;
 
-            let minDashArray, midDashArray, maxDashArray, minCap, midCap, maxCap;
+            let dashArray, cap;
 
             if (dashPropertyValue.kind === 'constant') {
-                const constDash = dashPropertyValue.value;
-                if (!constDash) continue;
-                minDashArray = constDash.other || constDash.to;
-                midDashArray = constDash.to;
-                maxDashArray = constDash.from;
+                dashArray = dashPropertyValue.value;
+                if (!dashArray) continue;
 
             } else {
-                minDashArray = dashPropertyValue.evaluate({zoom: zoom - 1}, feature);
-                midDashArray = dashPropertyValue.evaluate({zoom}, feature);
-                maxDashArray = dashPropertyValue.evaluate({zoom: zoom + 1}, feature);
+                dashArray = dashPropertyValue.evaluate({zoom}, feature);
             }
 
             if (capPropertyValue.kind === 'constant') {
-                minCap = midCap = maxCap = capPropertyValue.value;
+                cap = capPropertyValue.value;
 
             } else {
-                minCap = capPropertyValue.evaluate({zoom: zoom - 1}, feature);
-                midCap = capPropertyValue.evaluate({zoom}, feature);
-                maxCap = capPropertyValue.evaluate({zoom: zoom + 1}, feature);
+                cap = capPropertyValue.evaluate({zoom}, feature);
             }
 
-            lineAtlas.addDash(minDashArray, minCap);
-            lineAtlas.addDash(midDashArray, midCap);
-            lineAtlas.addDash(maxDashArray, maxCap);
-
-            const min = lineAtlas.getKey(minDashArray, minCap);
-            const mid = lineAtlas.getKey(midDashArray, midCap);
-            const max = lineAtlas.getKey(maxDashArray, maxCap);
+            lineAtlas.addDash(dashArray, cap);
 
             // save positions for paint array
-            feature.patterns[layer.id] = {min, mid, max};
+            feature.patterns[layer.id] = lineAtlas.getKey(dashArray, cap);
         }
 
     }
 
-    update(states: FeatureStates, vtLayer: VectorTileLayer, imagePositions: {[_: string]: ImagePosition}) {
+    update(states: FeatureStates, vtLayer: IVectorTileLayer, availableImages: Array<string>, imagePositions: SpritePositions) {
         if (!this.stateDependentLayers.length) return;
-        this.programConfigurations.updatePaintArrays(states, vtLayer, this.stateDependentLayers, imagePositions);
+        this.programConfigurations.updatePaintArrays(states, vtLayer, this.stateDependentLayers, availableImages, imagePositions);
     }
 
-    addFeatures(options: PopulateParameters, canonical: CanonicalTileID, imagePositions: {[_: string]: ImagePosition}) {
+    addFeatures(options: PopulateParameters, canonical: CanonicalTileID, imagePositions: SpritePositions, availableImages: Array<string>, _: TileTransform) {
         for (const feature of this.patternFeatures) {
-            this.addFeature(feature, feature.geometry, feature.index, canonical, imagePositions);
+            this.addFeature(feature, feature.geometry, feature.index, canonical, imagePositions, availableImages);
         }
     }
 
-    isEmpty() {
+    isEmpty(): boolean {
         return this.layoutVertexArray.length === 0;
     }
 
-    uploadPending() {
+    uploadPending(): boolean {
         return !this.uploaded || this.programConfigurations.needsUpload;
     }
 
@@ -313,7 +301,7 @@ class LineBucket implements Bucket {
         }
     }
 
-    addFeature(feature: BucketFeature, geometry: Array<Array<Point>>, index: number, canonical: CanonicalTileID, imagePositions: {[_: string]: ImagePosition}) {
+    addFeature(feature: BucketFeature, geometry: Array<Array<Point>>, index: number, canonical: CanonicalTileID, imagePositions: SpritePositions, availableImages: Array<string>) {
         const layout = this.layers[0].layout;
         const join = layout.get('line-join').evaluate(feature, {});
         const cap = layout.get('line-cap').evaluate(feature, {});
@@ -325,7 +313,7 @@ class LineBucket implements Bucket {
             this.addLine(line, feature, join, cap, miterLimit, roundLimit);
         }
 
-        this.programConfigurations.populatePaintArrays(this.layoutVertexArray.length, feature, index, imagePositions, canonical);
+        this.programConfigurations.populatePaintArrays(this.layoutVertexArray.length, feature, index, imagePositions, availableImages, canonical);
     }
 
     addLine(vertices: Array<Point>, feature: BucketFeature, join: string, cap: string, miterLimit: number, roundLimit: number) {
@@ -621,7 +609,7 @@ class LineBucket implements Bucket {
 
         // Constructs a second vertex buffer with higher precision line progress
         if (this.lineClips) {
-            this.layoutVertexArray2.emplaceBack(this.scaledDistance, this.lineClipsArray.length, this.lineSoFar);
+            this.layoutVertexArray2.emplaceBack(this.scaledDistance, this.lineClipsArray.length, this.lineClips.start, this.lineClips.end);
         }
 
         const e = segment.vertexLength++;
@@ -657,6 +645,6 @@ class LineBucket implements Bucket {
     }
 }
 
-register('LineBucket', LineBucket, {omit: ['layers', 'patternFeatures']});
+register(LineBucket, 'LineBucket', {omit: ['layers', 'patternFeatures']});
 
 export default LineBucket;

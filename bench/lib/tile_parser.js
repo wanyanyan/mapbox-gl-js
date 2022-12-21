@@ -1,7 +1,7 @@
 // @flow
 
 import Protobuf from 'pbf';
-import VT from '@mapbox/vector-tile';
+import {VectorTile} from '@mapbox/vector-tile';
 import assert from 'assert';
 
 import deref from '../../src/style-spec/deref.js';
@@ -15,6 +15,7 @@ import type {StyleSpecification} from '../../src/style-spec/types.js';
 import type {WorkerTileResult} from '../../src/source/worker_source.js';
 import type {OverscaledTileID} from '../../src/source/tile_id.js';
 import type {TileJSON} from '../../src/types/tilejson.js';
+import {getProjection} from '../../src/geo/projection/index.js';
 
 class StubMap extends Evented {
     _requestManager: RequestManager;
@@ -107,7 +108,7 @@ export default class TileParser {
         });
     }
 
-    fetchTile(tileID: OverscaledTileID) {
+    fetchTile(tileID: OverscaledTileID): Promise<{| buffer: ArrayBuffer, tileID: OverscaledTileID |}> {
         return fetch(this.style.map._requestManager.normalizeTileURL(tileID.canonical.url(this.tileJSON.tiles)))
             .then(response => response.arrayBuffer())
             .then(buffer => ({tileID, buffer}));
@@ -132,10 +133,11 @@ export default class TileParser {
             cameraToTileDistance: 0,
             returnDependencies,
             promoteId: undefined,
-            isSymbolTile: false
+            isSymbolTile: false,
+            projection: getProjection({name: 'mercator'})
         });
 
-        const vectorTile = new VT.VectorTile(new Protobuf(tile.buffer));
+        const vectorTile = new VectorTile(new Protobuf(tile.buffer));
 
         return new Promise((resolve, reject) => {
             workerTile.parse(vectorTile, this.layerIndex, [], (this.actor: any), (err, result) => {

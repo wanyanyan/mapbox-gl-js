@@ -2,12 +2,13 @@
 
 import {getArrayBuffer} from '../util/ajax.js';
 
-import vt from '@mapbox/vector-tile';
+import {VectorTile} from '@mapbox/vector-tile';
 import Protobuf from 'pbf';
 import WorkerTile from './worker_tile.js';
 import {extend} from '../util/util.js';
 import {getPerformanceMeasurement} from '../util/performance.js';
 import {Evented} from '../util/evented.js';
+import tileTransform from '../geo/projection/tile_transform.js';
 
 import type {
     WorkerSource,
@@ -21,10 +22,11 @@ import type Actor from '../util/actor.js';
 import type StyleLayerIndex from '../style/style_layer_index.js';
 import type {Callback} from '../types/callback.js';
 import type Scheduler from '../util/scheduler.js';
+import type {IVectorTile} from '@mapbox/vector-tile';
 
 export type LoadVectorTileResult = {
     rawData: ArrayBuffer;
-    vectorTile?: VectorTile;
+    vectorTile?: IVectorTile;
     expires?: any;
     cacheControl?: any;
     resourceTiming?: Array<PerformanceResourceTiming>;
@@ -49,7 +51,7 @@ export class DedupedRequest {
         this.scheduler = scheduler;
     }
 
-    request(key: string, metadata: Object, request: any, callback: LoadVectorDataCallback) {
+    request(key: string, metadata: Object, request: any, callback: LoadVectorDataCallback): (() => void) {
         const entry = this.entries[key] = this.entries[key] || {callbacks: []};
 
         if (entry.result) {
@@ -96,7 +98,7 @@ export class DedupedRequest {
 /**
  * @private
  */
-export function loadVectorTile(params: RequestedTileParameters, callback: LoadVectorDataCallback, skipParse?: boolean) {
+export function loadVectorTile(params: RequestedTileParameters, callback: LoadVectorDataCallback, skipParse?: boolean): (() => void) {
     const key = JSON.stringify(params.request);
 
     const makeRequest = (callback) => {
@@ -105,7 +107,7 @@ export function loadVectorTile(params: RequestedTileParameters, callback: LoadVe
                 callback(err);
             } else if (data) {
                 callback(null, {
-                    vectorTile: skipParse ? undefined : new vt.VectorTile(new Protobuf(data)),
+                    vectorTile: skipParse ? undefined : new VectorTile(new Protobuf(data)),
                     rawData: data,
                     cacheControl,
                     expires
@@ -120,11 +122,11 @@ export function loadVectorTile(params: RequestedTileParameters, callback: LoadVe
 
     if (params.data) {
         // if we already got the result earlier (on the main thread), return it directly
-        this.deduped.entries[key] = {result: [null, params.data]};
+        (this.deduped: DedupedRequest).entries[key] = {result: [null, params.data]};
     }
 
     const callbackMetadata = {type: 'parseTile', isSymbolTile: params.isSymbolTile, zoom: params.tileZoom};
-    return this.deduped.request(key, callbackMetadata, makeRequest, callback);
+    return (this.deduped: DedupedRequest).request(key, callbackMetadata, makeRequest, callback);
 }
 
 /**
@@ -199,7 +201,7 @@ class VectorTileWorkerSource extends Evented implements WorkerSource {
 
             // response.vectorTile will be present in the GeoJSON worker case (which inherits from this class)
             // because we stub the vector tile interface around JSON data instead of parsing it directly
-            workerTile.vectorTile = response.vectorTile || new vt.VectorTile(new Protobuf(rawTileData));
+            workerTile.vectorTile = response.vectorTile || new VectorTile(new Protobuf(rawTileData));
             const parseTile = () => {
                 workerTile.parse(workerTile.vectorTile, this.layerIndex, this.availableImages, this.actor, (err, result) => {
                     if (err || !result) return callback(err);
@@ -248,6 +250,8 @@ class VectorTileWorkerSource extends Evented implements WorkerSource {
             const workerTile = loaded[uid];
             workerTile.showCollisionBoxes = params.showCollisionBoxes;
             workerTile.enableTerrain = !!params.enableTerrain;
+            workerTile.projection = params.projection;
+            workerTile.tileTransform = tileTransform(params.tileID.canonical, params.projection);
 
             const done = (err, data) => {
                 const reloadCallback = workerTile.reloadCallback;

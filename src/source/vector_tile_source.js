@@ -101,13 +101,18 @@ class VectorTileSource extends Evented implements Source {
         this._deduped = new DedupedRequest();
     }
 
-    load() {
+    load(callback?: Callback<void>) {
         this._loaded = false;
         this.fire(new Event('dataloading', {dataType: 'source'}));
-        this._tileJSONRequest = loadTileJSON(this._options, this.map._requestManager, (err, tileJSON) => {
+        const language = Array.isArray(this.map._language) ? this.map._language.join() : this.map._language;
+        const worldview = this.map._worldview;
+        this._tileJSONRequest = loadTileJSON(this._options, this.map._requestManager, language, worldview, (err, tileJSON) => {
             this._tileJSONRequest = null;
             this._loaded = true;
             if (err) {
+                if (language) console.warn(`Ensure that your requested language string is a valid BCP-47 code or list of codes. Found: ${language}`);
+                if (worldview && worldview.length !== 2) console.warn(`Requested worldview strings must be a valid ISO alpha-2 code. Found: ${worldview}`);
+
                 this.fire(new ErrorEvent(err));
             } else if (tileJSON) {
                 extend(this, tileJSON);
@@ -120,6 +125,8 @@ class VectorTileSource extends Evented implements Source {
                 this.fire(new Event('data', {dataType: 'source', sourceDataType: 'metadata'}));
                 this.fire(new Event('data', {dataType: 'source', sourceDataType: 'content'}));
             }
+
+            if (callback) callback(err);
         });
     }
 
@@ -127,7 +134,7 @@ class VectorTileSource extends Evented implements Source {
         return this._loaded;
     }
 
-    hasTile(tileID: OverscaledTileID) {
+    hasTile(tileID: OverscaledTileID): boolean {
         return !this.tileBounds || this.tileBounds.contains(tileID.canonical);
     }
 
@@ -136,18 +143,22 @@ class VectorTileSource extends Evented implements Source {
         this.load();
     }
 
+    reload() {
+        this.cancelTileJSONRequest();
+
+        const clearTiles = () => {
+            const sourceCaches = this.map.style._getSourceCaches(this.id);
+            for (const sourceCache of sourceCaches) {
+                sourceCache.clearTiles();
+            }
+        };
+
+        this.load(clearTiles);
+    }
+
     setSourceProperty(callback: Function) {
-        if (this._tileJSONRequest) {
-            this._tileJSONRequest.cancel();
-        }
-
         callback();
-
-        const sourceCaches = this.map.style._getSourceCaches(this.id);
-        for (const sourceCache of sourceCaches) {
-            sourceCache.clearTiles();
-        }
-        this.load();
+        this.reload();
     }
 
     /**
@@ -168,10 +179,9 @@ class VectorTileSource extends Evented implements Source {
      * // Set the endpoint associated with a vector tile source.
      * vectorTileSource.setTiles(['https://another_end_point.net/{z}/{x}/{y}.mvt']);
      */
-    setTiles(tiles: Array<string>) {
-        this.setSourceProperty(() => {
-            this._options.tiles = tiles;
-        });
+    setTiles(tiles: Array<string>): this {
+        this._options.tiles = tiles;
+        this.reload();
 
         return this;
     }
@@ -192,23 +202,19 @@ class VectorTileSource extends Evented implements Source {
      * // Update vector tile source to a new URL endpoint
      * vectorTileSource.setUrl("mapbox://mapbox.mapbox-streets-v8");
      */
-    setUrl(url: string) {
-        this.setSourceProperty(() => {
-            this.url = url;
-            this._options.url = url;
-        });
+    setUrl(url: string): this {
+        this.url = url;
+        this._options.url = url;
+        this.reload();
 
         return this;
     }
 
     onRemove() {
-        if (this._tileJSONRequest) {
-            this._tileJSONRequest.cancel();
-            this._tileJSONRequest = null;
-        }
+        this.cancelTileJSONRequest();
     }
 
-    serialize() {
+    serialize(): VectorSourceSpecification {
         return extend({}, this._options);
     }
 
@@ -310,12 +316,18 @@ class VectorTileSource extends Evented implements Source {
         }
     }
 
-    hasTransition() {
+    hasTransition(): boolean {
         return false;
     }
 
     afterUpdate() {
         this._tileWorkers = {};
+    }
+
+    cancelTileJSONRequest() {
+        if (!this._tileJSONRequest) return;
+        this._tileJSONRequest.cancel();
+        this._tileJSONRequest = null;
     }
 }
 

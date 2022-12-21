@@ -60,14 +60,19 @@ class Context {
     pixelStoreUnpack: PixelStoreUnpack;
     pixelStoreUnpackPremultiplyAlpha: PixelStoreUnpackPremultiplyAlpha;
     pixelStoreUnpackFlipY: PixelStoreUnpackFlipY;
+    renderer: ?string;
+    vendor: ?string;
 
     extTextureFilterAnisotropic: any;
     extTextureFilterAnisotropicMax: any;
     extTextureHalfFloat: any;
     extRenderToTextureHalfFloat: any;
+    extStandardDerivatives: any;
+    extDebugRendererInfo: any;
     extTimerQuery: any;
 
     extTextureFilterAnisotropicForceOff: boolean;
+    extStandardDerivativesForceOff: boolean;
 
     constructor(gl: WebGLRenderingContext) {
         this.gl = gl;
@@ -114,12 +119,20 @@ class Context {
             this.extTextureFilterAnisotropicMax = gl.getParameter(this.extTextureFilterAnisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
         }
         this.extTextureFilterAnisotropicForceOff = false;
+        this.extStandardDerivativesForceOff = false;
+
+        this.extDebugRendererInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (this.extDebugRendererInfo) {
+            this.renderer = gl.getParameter(this.extDebugRendererInfo.UNMASKED_RENDERER_WEBGL);
+            this.vendor = gl.getParameter(this.extDebugRendererInfo.UNMASKED_VENDOR_WEBGL);
+        }
 
         this.extTextureHalfFloat = gl.getExtension('OES_texture_half_float');
         if (this.extTextureHalfFloat) {
             gl.getExtension('OES_texture_half_float_linear');
             this.extRenderToTextureHalfFloat = gl.getExtension('EXT_color_buffer_half_float');
         }
+        this.extStandardDerivatives = gl.getExtension('OES_standard_derivatives');
 
         this.extTimerQuery = gl.getExtension('EXT_disjoint_timer_query');
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
@@ -191,15 +204,15 @@ class Context {
         this.pixelStoreUnpackFlipY.dirty = true;
     }
 
-    createIndexBuffer(array: TriangleIndexArray | LineIndexArray | LineStripIndexArray, dynamicDraw?: boolean) {
+    createIndexBuffer(array: TriangleIndexArray | LineIndexArray | LineStripIndexArray, dynamicDraw?: boolean): IndexBuffer {
         return new IndexBuffer(this, array, dynamicDraw);
     }
 
-    createVertexBuffer(array: StructArray, attributes: $ReadOnlyArray<StructArrayMember>, dynamicDraw?: boolean) {
+    createVertexBuffer(array: StructArray, attributes: $ReadOnlyArray<StructArrayMember>, dynamicDraw?: boolean): VertexBuffer {
         return new VertexBuffer(this, array, attributes, dynamicDraw);
     }
 
-    createRenderbuffer(storageFormat: number, width: number, height: number) {
+    createRenderbuffer(storageFormat: number, width: number, height: number): ?WebGLRenderbuffer {
         const gl = this.gl;
 
         const rbo = gl.createRenderbuffer();
@@ -210,7 +223,7 @@ class Context {
         return rbo;
     }
 
-    createFramebuffer(width: number, height: number, hasDepth: boolean) {
+    createFramebuffer(width: number, height: number, hasDepth: boolean): Framebuffer {
         return new Framebuffer(this, width, height, hasDepth);
     }
 

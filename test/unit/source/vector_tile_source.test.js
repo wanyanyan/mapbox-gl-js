@@ -19,16 +19,17 @@ const mockDispatcher = wrapDispatcher({
     send () {}
 });
 
-function createSource(options, transformCallback) {
+function createSource(options, {transformCallback, customAccessToken} = {}) {
     const source = new VectorTileSource('id', options, mockDispatcher, options.eventedParent);
+    const sourceCache = {clearTiles: () => {}};
+
     source.onAdd({
         transform: {showCollisionBoxes: false},
         _getMapId: () => 1,
-        _requestManager: new RequestManager(transformCallback),
+        _requestManager: new RequestManager(transformCallback, customAccessToken),
+        _sourceCaches: [sourceCache],
         style: {
-            _getSourceCaches: () => {
-                return [{clearTiles: () => {}}];
-            }
+            _getSourceCaches: () => [sourceCache]
         }
     });
 
@@ -40,14 +41,12 @@ function createSource(options, transformCallback) {
 }
 
 test('VectorTileSource', (t) => {
-    t.beforeEach((callback) => {
+    t.beforeEach(() => {
         window.useFakeXMLHttpRequest();
-        callback();
     });
 
-    t.afterEach((callback) => {
+    t.afterEach(() => {
         window.restore();
-        callback();
     });
 
     t.test('can be constructed from TileJSON', (t) => {
@@ -93,7 +92,7 @@ test('VectorTileSource', (t) => {
             return {url};
         });
 
-        createSource({url: "/source.json"}, transformSpy);
+        createSource({url: "/source.json"}, {transformCallback: transformSpy});
         window.server.respond();
         t.equal(transformSpy.getCall(0).args[0], '/source.json');
         t.equal(transformSpy.getCall(0).args[1], 'Source');
@@ -182,6 +181,36 @@ test('VectorTileSource', (t) => {
 
     testScheme('xyz', 'http://example.com/10/5/5.png');
     testScheme('tms', 'http://example.com/10/5/1018.png');
+
+    function testRemoteScheme(scheme, expectedURL) {
+        t.test(`remote scheme "${scheme}"`, (t) => {
+            window.server.respondWith('/source.json', JSON.stringify({...sourceFixture, scheme}));
+
+            const source = createSource({url: "/source.json"});
+
+            source.dispatcher = wrapDispatcher({
+                send(type, params) {
+                    t.equal(type, 'loadTile');
+                    t.equal(expectedURL, params.request.url);
+                    t.end();
+                }
+            });
+
+            source.on('data', (e) => {
+                if (e.sourceDataType === 'metadata') {
+                    t.deepEqual(source.scheme, scheme);
+                    source.loadTile({
+                        tileID: new OverscaledTileID(10, 0, 10, 5, 5)
+                    }, () => {});
+                }
+            });
+
+            window.server.respond();
+        });
+    }
+
+    testRemoteScheme('xyz', 'http://example.com/10/5/5.png');
+    testRemoteScheme('tms', 'http://example.com/10/5/1018.png');
 
     t.test('transforms tile urls before requesting', (t) => {
         window.server.respondWith('/source.json', JSON.stringify(sourceFixture));
@@ -360,34 +389,102 @@ test('VectorTileSource', (t) => {
         t.end();
     });
 
-    t.test('supports url property updates', (t) => {
-        const source = createSource({
-            url: "http://localhost:2900/source.json"
+    t.test('supports property updates', (t) => {
+        window.server.configure({respondImmediately: true});
+        window.server.respondWith('/source.json', JSON.stringify(sourceFixture));
+        const source = createSource({url: '/source.json'});
+
+        const loadSpy = t.spy(source, 'load');
+        const clearTilesSpy = t.spy(source.map._sourceCaches[0], 'clearTiles');
+
+        const responseSpy = t.spy((xhr) =>
+            xhr.respond(200, {"Content-Type": "application/json"}, JSON.stringify({...sourceFixture, maxzoom: 22})));
+
+        window.server.respondWith('/source.json', responseSpy);
+
+        source.setSourceProperty(() => {
+            source.attribution = 'OpenStreetMap';
         });
-        source.setUrl("http://localhost:2900/source2.json");
-        t.deepEqual(source.serialize(), {
-            type: 'vector',
-            url: "http://localhost:2900/source2.json"
-        });
+
+        t.ok(loadSpy.calledOnce);
+        t.ok(responseSpy.calledOnce);
+        t.ok(clearTilesSpy.calledOnce);
+        t.ok(clearTilesSpy.calledAfter(responseSpy), 'Tiles should be cleared after TileJSON is loaded');
+
         t.end();
+    });
+
+    t.test('supports url property updates', (t) => {
+        window.server.respondWith('/source.json', JSON.stringify(sourceFixture));
+        window.server.respondWith('/new-source.json', JSON.stringify({...sourceFixture, minzoom: 0, maxzoom: 22}));
+        window.server.configure({autoRespond: true, autoRespondAfter: 0});
+
+        const source = createSource({url: '/source.json'});
+        source.setUrl('/new-source.json');
+
+        source.on('data', (e) => {
+            if (e.sourceDataType === 'metadata') {
+                t.deepEqual(source.minzoom, 0);
+                t.deepEqual(source.maxzoom, 22);
+                t.deepEqual(source.attribution, 'Mapbox');
+                t.deepEqual(source.serialize(), {type: 'vector', url: '/new-source.json'});
+                t.end();
+            }
+        });
     });
 
     t.test('supports tiles property updates', (t) => {
         const source = createSource({
             minzoom: 1,
             maxzoom: 10,
-            attribution: "Mapbox",
-            tiles: ["http://example.com/{z}/{x}/{y}.png"]
+            attribution: 'Mapbox',
+            tiles: ['http://example.com/v1/{z}/{x}/{y}.png']
         });
-        source.setTiles(["http://example2.com/{z}/{x}/{y}.png"]);
-        t.deepEqual(source.serialize(), {
-            type: 'vector',
+
+        source.setTiles(['http://example.com/v2/{z}/{x}/{y}.png']);
+
+        source.on('data', (e) => {
+            if (e.sourceDataType === 'metadata') {
+                t.deepEqual(source.serialize(), {
+                    type: 'vector',
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Mapbox',
+                    tiles: ['http://example.com/v2/{z}/{x}/{y}.png']
+                });
+                t.end();
+            }
+        });
+    });
+
+    t.test('prefers TileJSON tiles, if both URL and tiles options are set', (t) => {
+        window.server.respondWith('/source.json', JSON.stringify(sourceFixture));
+        window.server.configure({autoRespond: true, autoRespondAfter: 0});
+
+        const source = createSource({
             minzoom: 1,
             maxzoom: 10,
-            attribution: "Mapbox",
-            tiles: ["http://example2.com/{z}/{x}/{y}.png"]
+            attribution: 'Mapbox',
+            tiles: ['http://example.com/old/{z}/{x}/{y}.png']
         });
-        t.end();
+
+        source.setUrl('/source.json');
+
+        source.on('data', (e) => {
+            if (e.sourceDataType === 'metadata') {
+                t.deepEqual(source.tiles, ['http://example.com/{z}/{x}/{y}.png']);
+
+                t.deepEqual(source.serialize(), {
+                    type: 'vector',
+                    url: '/source.json',
+                    minzoom: 1,
+                    maxzoom: 10,
+                    attribution: 'Mapbox'
+                });
+
+                t.end();
+            }
+        });
     });
 
     t.end();

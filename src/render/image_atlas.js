@@ -7,6 +7,7 @@ import potpack from 'potpack';
 import type {StyleImage} from '../style/style_image.js';
 import type ImageManager from './image_manager.js';
 import type Texture from './texture.js';
+import type {SpritePosition} from '../util/image.js';
 
 const IMAGE_PADDING: number = 1;
 export {IMAGE_PADDING};
@@ -18,7 +19,7 @@ type Rect = {
     h: number
 };
 
-export class ImagePosition {
+export class ImagePosition implements SpritePosition {
     paddedRect: Rect;
     pixelRatio: number;
     version: number;
@@ -122,6 +123,7 @@ export default class ImageAtlas {
     }
 
     patchUpdatedImages(imageManager: ImageManager, texture: Texture) {
+        this.haveRenderCallbacks = this.haveRenderCallbacks.filter(id => imageManager.hasImage(id));
         imageManager.dispatchRenderCallbacks(this.haveRenderCallbacks);
         for (const name in imageManager.updatedImages) {
             this.patchUpdatedImage(this.iconPositions[name], imageManager.getImage(name), texture);
@@ -141,5 +143,5 @@ export default class ImageAtlas {
 
 }
 
-register('ImagePosition', ImagePosition);
-register('ImageAtlas', ImageAtlas);
+register(ImagePosition, 'ImagePosition');
+register(ImageAtlas, 'ImageAtlas');

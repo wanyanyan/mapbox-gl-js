@@ -1,6 +1,7 @@
 // @flow
 
 import type Map from '../map.js';
+import type {HandlerResult} from '../handler_manager.js';
 
 const defaultOptions = {
     panStep: 100,
@@ -45,11 +46,15 @@ class KeyboardHandler {
         this._rotationDisabled = false;
     }
 
+    blur() {
+        this.reset();
+    }
+
     reset() {
         this._active = false;
     }
 
-    keydown(e: KeyboardEvent) {
+    keydown(e: KeyboardEvent): ?HandlerResult {
         if (e.altKey || e.ctrlKey || e.metaKey) return;
 
         let zoomDir = 0;
@@ -120,11 +125,11 @@ class KeyboardHandler {
         return {
             cameraAnimation: (map: Map) => {
                 const zoom = map.getZoom();
+
                 map.easeTo({
                     duration: 300,
                     easeId: 'keyboardHandler',
                     easing: easeOut,
-
                     zoom: zoomDir ? Math.round(zoom) + zoomDir * (e.shiftKey ? 2 : 1) : zoom,
                     bearing: map.getBearing() + bearingDir * this._bearingStep,
                     pitch: map.getPitch() + pitchDir * this._pitchStep,
@@ -165,7 +170,7 @@ class KeyboardHandler {
      * @example
      * const isKeyboardEnabled = map.keyboard.isEnabled();
      */
-    isEnabled() {
+    isEnabled(): boolean {
         return this._enabled;
     }
 
@@ -178,7 +183,7 @@ class KeyboardHandler {
      * @example
      * const isKeyboardActive = map.keyboard.isActive();
      */
-    isActive() {
+    isActive(): boolean {
         return this._active;
     }
 

@@ -1,7 +1,7 @@
 import {test} from '../../../util/test.js';
 import window from '../../../../src/util/window.js';
 import Map from '../../../../src/ui/map.js';
-import DOM from '../../../../src/util/dom.js';
+import * as DOM from '../../../../src/util/dom.js';
 import simulate from '../../../util/simulate_interaction.js';
 
 function createMap(t, clickTolerance) {
@@ -33,6 +33,25 @@ test('BoxZoomHandler fires boxzoomstart and boxzoomend events at appropriate tim
     map._renderTaskQueue.run();
     t.equal(boxzoomstart.callCount, 1);
     t.equal(boxzoomend.callCount, 1);
+
+    map.remove();
+    t.end();
+});
+
+test('BoxZoomHandler fires boxzoomcancel events at the appropriate time', (t) => {
+    const map = createMap(t);
+
+    const boxzoomcancel = t.spy();
+
+    map.on('boxzoomcancel', boxzoomcancel);
+
+    simulate.mousedown(map.getCanvas(), {shiftKey: true, clientX: 0, clientY: 0});
+    map._renderTaskQueue.run();
+    t.equal(boxzoomcancel.callCount, 0);
+
+    simulate.mouseup(map.getCanvas(), {shiftKey: false, clientX: 0, clientY: 0});
+    map._renderTaskQueue.run();
+    t.equal(boxzoomcancel.callCount, 1);
 
     map.remove();
     t.end();
@@ -108,29 +127,34 @@ test('BoxZoomHandler does not begin a box zoom if preventDefault is called on th
     t.end();
 });
 
-test('BoxZoomHandler does not begin a box zoom on spurious mousemove events', (t) => {
+test('BoxZoomHandler cancels a box zoom on spurious mousemove events', (t) => {
     const map = createMap(t);
 
     const boxzoomstart = t.spy();
     const boxzoomend   = t.spy();
+    const boxzoomcancel = t.spy();
 
     map.on('boxzoomstart', boxzoomstart);
     map.on('boxzoomend',   boxzoomend);
+    map.on('boxzoomcancel', boxzoomcancel);
 
     simulate.mousedown(map.getCanvas(), {shiftKey: true, clientX: 0, clientY: 0});
     map._renderTaskQueue.run();
     t.equal(boxzoomstart.callCount, 0);
     t.equal(boxzoomend.callCount, 0);
+    t.equal(boxzoomcancel.callCount, 0);
 
     simulate.mousemove(map.getCanvas(), {shiftKey: true, clientX: 0, clientY: 0});
     map._renderTaskQueue.run();
     t.equal(boxzoomstart.callCount, 0);
     t.equal(boxzoomend.callCount, 0);
+    t.equal(boxzoomcancel.callCount, 0);
 
     simulate.mouseup(map.getCanvas(), {shiftKey: true, clientX: 0, clientY: 0});
     map._renderTaskQueue.run();
     t.equal(boxzoomstart.callCount, 0);
     t.equal(boxzoomend.callCount, 0);
+    t.equal(boxzoomcancel.callCount, 1);
 
     map.remove();
     t.end();

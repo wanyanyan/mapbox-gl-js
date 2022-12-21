@@ -1,5 +1,6 @@
 // @flow
 
+import type StyleLayer from './style_layer.js';
 import circle from './style_layer/circle_style_layer.js';
 import heatmap from './style_layer/heatmap_style_layer.js';
 import hillshade from './style_layer/hillshade_style_layer.js';
@@ -30,11 +31,10 @@ const subclasses = {
     model
 };
 
-export default function createStyleLayer(layer: LayerSpecification | CustomLayerInterface) {
+export default function createStyleLayer(layer: LayerSpecification | CustomLayerInterface): StyleLayer | CustomStyleLayer {
     if (layer.type === 'custom') {
         return new CustomStyleLayer(layer);
     } else {
         return new subclasses[layer.type](layer);
     }
 }
-

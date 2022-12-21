@@ -5,11 +5,23 @@
 #define NUM_SAMPLES_PER_RING 16
 
 uniform mat4 u_matrix;
-uniform vec2 u_extrude_scale;
+uniform mat2 u_extrude_scale;
 uniform lowp float u_device_pixel_ratio;
 uniform highp float u_camera_to_center_distance;
 
 attribute vec2 a_pos;
+
+#ifdef PROJECTION_GLOBE_VIEW
+attribute vec3 a_pos_3;         // Projected position on the globe
+attribute vec3 a_pos_normal_3;  // Surface normal at the position
+
+// Uniforms required for transition between globe and mercator
+uniform mat4 u_inv_rot_matrix;
+uniform vec2 u_merc_center;
+uniform vec3 u_tile_id;
+uniform float u_zoom_transition;
+uniform vec3 u_up_dir;
+#endif
 
 varying vec3 v_data;
 varying float v_visibility;
@@ -46,10 +58,14 @@ float circle_elevation(vec2 pos) {
 #endif
 }
 
-vec4 project_vertex(vec2 extrusion, vec4 world_center, vec4 projected_center, float radius, float stroke_width,  float view_scale) {
+vec4 project_vertex(vec2 extrusion, vec4 world_center, vec4 projected_center, float radius, float stroke_width,  float view_scale, mat3 surface_vectors) {
     vec2 sample_offset = calc_offset(extrusion, radius, stroke_width, view_scale);
 #ifdef PITCH_WITH_MAP
-    return u_matrix * ( world_center + vec4(sample_offset, 0, 0) );
+    #ifdef PROJECTION_GLOBE_VIEW
+        return u_matrix * ( world_center + vec4(sample_offset.x * surface_vectors[0] + sample_offset.y * surface_vectors[1], 0) );
+    #else
+        return u_matrix * ( world_center + vec4(sample_offset, 0, 0) );
+    #endif
 #else
     return projected_center + vec4(sample_offset, 0, 0);
 #endif
@@ -80,9 +96,29 @@ void main(void) {
     // multiply a_pos by 0.5, since we had it * 2 in order to sneak
     // in extrusion data
     vec2 circle_center = floor(a_pos * 0.5);
+
+    vec4 world_center;
+    mat3 surface_vectors;
+#ifdef PROJECTION_GLOBE_VIEW
+    // Compute positions on both globe and mercator plane to support transition between the two modes
+    // Apply extra scaling to extrusion to cover different pixel space ratios (which is dependant on the latitude)
+    vec3 pos_normal_3 = a_pos_normal_3 / 16384.0;
+    surface_vectors = globe_mercator_surface_vectors(pos_normal_3, u_up_dir, u_zoom_transition);
+
+    vec3 surface_extrusion = extrude.x * surface_vectors[0] + extrude.y * surface_vectors[1];
+    vec3 globe_elevation = elevationVector(circle_center) * circle_elevation(circle_center);
+    vec3 globe_pos = a_pos_3 + surface_extrusion + globe_elevation;
+    vec3 mercator_elevation = u_up_dir * u_tile_up_scale * circle_elevation(circle_center);
+    vec3 merc_pos = mercator_tile_position(u_inv_rot_matrix, circle_center, u_tile_id, u_merc_center) + surface_extrusion + mercator_elevation;
+    vec3 pos = mix_globe_mercator(globe_pos, merc_pos, u_zoom_transition);
+    world_center = vec4(pos, 1);
+#else 
+    surface_vectors = mat3(1.0);
     // extract height offset for terrain, this returns 0 if terrain is not active
     float height = circle_elevation(circle_center);
-    vec4 world_center = vec4(circle_center, height, 1);
+    world_center = vec4(circle_center, height, 1);
+#endif
+
     vec4 projected_center = u_matrix * world_center;
 
     float view_scale = 0.0;
@@ -102,31 +138,38 @@ void main(void) {
             view_scale = projected_center.w;
         #endif
     #endif
-    gl_Position = project_vertex(extrude, world_center, projected_center, radius, stroke_width, view_scale);
+    gl_Position = project_vertex(extrude, world_center, projected_center, radius, stroke_width, view_scale, surface_vectors);
 
     float visibility = 0.0;
     #ifdef TERRAIN
         float step = get_sample_step();
+        vec4 occlusion_world_center;
+        vec4 occlusion_projected_center;
         #ifdef PITCH_WITH_MAP
             // to prevent the circle from self-intersecting with the terrain underneath on a sloped hill,
             // we calculate the elevation at each corner and pick the highest one when computing visibility.
             float cantilevered_height = cantilevered_elevation(circle_center, radius, stroke_width, view_scale);
-            vec4 occlusion_world_center = vec4(circle_center, cantilevered_height, 1);
-            vec4 occlusion_projected_center = u_matrix * occlusion_world_center;
+            occlusion_world_center = vec4(circle_center, cantilevered_height, 1);
+            occlusion_projected_center = u_matrix * occlusion_world_center;
         #else
-            vec4 occlusion_world_center = world_center;
-            vec4 occlusion_projected_center = projected_center;
+            occlusion_world_center = world_center;
+            occlusion_projected_center = projected_center;
         #endif
         for(int ring = 0; ring < NUM_VISIBILITY_RINGS; ring++) {
             float scale = (float(ring) + 1.0)/float(NUM_VISIBILITY_RINGS);
             for(int i = 0; i < NUM_SAMPLES_PER_RING; i++) {
                 vec2 extrusion = vec2(cos(step * float(i)), -sin(step * float(i))) * scale;
-                vec4 frag_pos = project_vertex(extrusion, occlusion_world_center, occlusion_projected_center, radius, stroke_width, view_scale);
+                vec4 frag_pos = project_vertex(extrusion, occlusion_world_center, occlusion_projected_center, radius, stroke_width, view_scale, surface_vectors);
                 visibility += float(!isOccluded(frag_pos));
             }
         }
         visibility /= float(NUM_VISIBILITY_RINGS) * float(NUM_SAMPLES_PER_RING);
     #else
+        visibility = 1.0;
+    #endif
+    // This is a temporary overwrite until we add support for terrain occlusion for the globe view
+    // Having a separate overwrite here makes the metal shader generation simpler for the default case
+    #ifdef PROJECTION_GLOBE_VIEW
         visibility = 1.0;
     #endif
     v_visibility = visibility;

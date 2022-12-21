@@ -72,6 +72,7 @@ export type StyleSpecification = {|
     "sprite"?: string,
     "glyphs"?: string,
     "transition"?: TransitionSpecification,
+    "projection"?: ProjectionSpecification,
     "layers": Array<LayerSpecification>
 |}
 
@@ -90,7 +91,16 @@ export type TerrainSpecification = {|
 export type FogSpecification = {|
     "range"?: PropertyValueSpecification<[number, number]>,
     "color"?: PropertyValueSpecification<ColorSpecification>,
-    "horizon-blend"?: PropertyValueSpecification<number>
+    "high-color"?: PropertyValueSpecification<ColorSpecification>,
+    "space-color"?: PropertyValueSpecification<ColorSpecification>,
+    "horizon-blend"?: PropertyValueSpecification<number>,
+    "star-intensity"?: PropertyValueSpecification<number>
+|}
+
+export type ProjectionSpecification = {|
+    "name": "albers" | "equalEarth" | "equirectangular" | "lambertConformalConic" | "mercator" | "naturalEarth" | "winkelTripel" | "globe",
+    "center"?: [number, number],
+    "parallels"?: [number, number]
 |}
 
 export type VectorSourceSpecification = {
@@ -236,7 +246,8 @@ export type LineLayerSpecification = {|
         "line-blur"?: DataDrivenPropertyValueSpecification<number>,
         "line-dasharray"?: DataDrivenPropertyValueSpecification<Array<number>>,
         "line-pattern"?: DataDrivenPropertyValueSpecification<ResolvedImageSpecification>,
-        "line-gradient"?: ExpressionSpecification
+        "line-gradient"?: ExpressionSpecification,
+        "line-trim-offset"?: [number, number]
     |}
 |}
 
@@ -370,7 +381,8 @@ export type FillExtrusionLayerSpecification = {|
     "maxzoom"?: number,
     "filter"?: FilterSpecification,
     "layout"?: {|
-        "visibility"?: "visible" | "none"
+        "visibility"?: "visible" | "none",
+        "fill-extrusion-edge-radius"?: number
     |},
     "paint"?: {|
         "fill-extrusion-opacity"?: PropertyValueSpecification<number>,
@@ -380,7 +392,9 @@ export type FillExtrusionLayerSpecification = {|
         "fill-extrusion-pattern"?: DataDrivenPropertyValueSpecification<ResolvedImageSpecification>,
         "fill-extrusion-height"?: DataDrivenPropertyValueSpecification<number>,
         "fill-extrusion-base"?: DataDrivenPropertyValueSpecification<number>,
-        "fill-extrusion-vertical-gradient"?: PropertyValueSpecification<boolean>
+        "fill-extrusion-vertical-gradient"?: PropertyValueSpecification<boolean>,
+        "fill-extrusion-ambient-occlusion-intensity"?: PropertyValueSpecification<number>,
+        "fill-extrusion-ambient-occlusion-radius"?: PropertyValueSpecification<number>
     |}
 |}
 

@@ -2,7 +2,7 @@
 
 import {Event} from '../util/evented.js';
 
-import DOM from '../util/dom.js';
+import * as DOM from '../util/dom.js';
 import Point from '@mapbox/point-geometry';
 import {extend} from '../util/util.js';
 
@@ -43,6 +43,7 @@ export class MapMouseEvent extends Event {
      */
     type: 'mousedown'
         | 'mouseup'
+        | 'preclick'
         | 'click'
         | 'dblclick'
         | 'mousemove'
@@ -73,9 +74,10 @@ export class MapMouseEvent extends Event {
     lngLat: LngLat;
 
     /**
-     * If a `layerId` was specified when adding the event listener with {@link Map#on}, `features` will be an array of
-     * [GeoJSON](http://geojson.org/) [Feature objects](https://tools.ietf.org/html/rfc7946#section-3.2).
-     * The array will contain all features from that layer that are rendered at the event's point.
+     * If a single `layerId`(as a single string) or multiple `layerIds` (as an array of strings) were specified when adding the event listener with {@link Map#on},
+     * `features` will be an array of [GeoJSON](http://geojson.org/) [Feature objects](https://tools.ietf.org/html/rfc7946#section-3.2).
+     * The array will contain all features from that layer that are rendered at the event's point,
+     * in the order that they are rendered with the topmost feature being at the start of the array.
      * The `features` are identical to those returned by {@link Map#queryRenderedFeatures}.
      *
      * If no `layerId` was specified when adding the event listener, `features` will be `undefined`.
@@ -84,6 +86,12 @@ export class MapMouseEvent extends Event {
      * @example
      * // logging features for a specific layer (with `e.features`)
      * map.on('click', 'myLayerId', (e) => {
+     *     console.log(`There are ${e.features.length} features at point ${e.point}`);
+     * });
+     *
+     * @example
+     * // logging features for two layers (with `e.features`)
+     * map.on('click', ['layer1', 'layer2'], (e) => {
      *     console.log(`There are ${e.features.length} features at point ${e.point}`);
      * });
      *
@@ -576,6 +584,17 @@ export type MapEvent =
     | 'mousemove'
 
     /**
+     * Triggered when a click event occurs and is fired before the click event.
+     * Primarily implemented to ensure closeOnClick for pop-ups is fired before any other listeners.
+     *
+     * @event preclick
+     * @memberof Map
+     * @instance
+     * @type {MapMouseEvent}
+     */
+     | 'preclick'
+
+    /**
      * Fired when a pointing device (usually a mouse) is pressed and released at the same point on the map.
      *
      * **Note:** This event is compatible with the optional `layerId` parameter.
@@ -695,7 +714,7 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // when the pointing device leave's
+     * // when the pointing device leaves
      * // the map's canvas.
      * map.on('mouseout', () => {
      *     console.log('A mouseout event occurred.');
@@ -751,7 +770,7 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // when a touchstart event occurs within the map.
+     * // when a `touchstart` event occurs within the map.
      * map.on('touchstart', () => {
      *     console.log('A touchstart event occurred.');
      * });
@@ -769,7 +788,7 @@ export type MapEvent =
      * @example
      * // Initialize the map.
      * const map = new mapboxgl.Map({});
-     * // Set an event listener that fires when a touchstart event occurs within the map.
+     * // Set an event listener that fires when a `touchstart` event occurs within the map.
      * map.on('touchstart', () => {
      *     console.log('A touchstart event occurred.');
      * });
@@ -805,7 +824,7 @@ export type MapEvent =
      * @example
      * // Initialize the map.
      * const map = new mapboxgl.Map({});
-     * // Set an event listener that fires when a touchcancel event occurs within the map.
+     * // Set an event listener that fires when a `touchcancel` event occurs within the map.
      * map.on('touchcancel', () => {
      *     console.log('A touchcancel event occurred.');
      * });
@@ -904,7 +923,7 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // repeatedly  during a "drag to pan" interaction.
+     * // repeatedly during a "drag to pan" interaction.
      * map.on('drag', () => {
      *     console.log('A drag event occurred.');
      * });
@@ -1383,7 +1402,7 @@ export type MapEvent =
 
     /**
      * Fired when any map data (style, source, tile, etc) begins loading or
-     * changing asyncronously. All `dataloading` events are followed by a `data`
+     * changing asynchronously. All `dataloading` events are followed by a `data`
      * or `error` event. See {@link MapDataEvent} for more information.
      *
      * @event dataloading
@@ -1403,7 +1422,7 @@ export type MapEvent =
     | 'dataloading'
 
     /**
-     * Fired when the map's style begins loading or changing asyncronously.
+     * Fired when the map's style begins loading or changing asynchronously.
      * All `styledataloading` events are followed by a `styledata`
      * or `error` event. See {@link MapDataEvent} for more information.
      *
@@ -1415,8 +1434,8 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // map's style begins loading or
-     * // changing asyncronously.
+     * // when the map's style begins loading or
+     * // changing asynchronously.
      * map.on('styledataloading', () => {
      *     console.log('A styledataloading event occurred.');
      * });
@@ -1424,7 +1443,7 @@ export type MapEvent =
     | 'styledataloading'
 
     /**
-     * Fired when one of the map's sources begins loading or changing asyncronously.
+     * Fired when one of the map's sources begins loading or changing asynchronously.
      * All `sourcedataloading` events are followed by a `sourcedata` or `error` event.
      * See {@link MapDataEvent} for more information.
      *
@@ -1436,8 +1455,8 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // map's sources begin loading or
-     * // changing asyncronously.
+     * // when the map's sources begin loading or
+     * // changing asynchronously.
      * map.on('sourcedataloading', () => {
      *     console.log('A sourcedataloading event occurred.');
      * });
@@ -1457,7 +1476,7 @@ export type MapEvent =
      * // Initialize the map
      * const map = new mapboxgl.Map({});
      * // Set an event listener that fires
-     * // an icon or pattern is missing.
+     * // when an icon or pattern is missing.
      * map.on('styleimagemissing', () => {
      *     console.log('A styleimagemissing event occurred.');
      * });
@@ -1474,7 +1493,7 @@ export type MapEvent =
     | 'style.load'
 
     /**
-     * Fired after speed index calculation is completed if speedIndexTiming option has set to true
+     * Fired after speed index calculation is completed if `speedIndexTiming` option has been set to `true`.
      *
      * @private
      * @event speedindexcompleted
@@ -1485,6 +1504,7 @@ export type MapEvent =
      * var map = new mapboxgl.Map({});
      * map.speedIndexTiming = true;
      * // Set an event listener that fires
+     * // after speed index calculation is completed.
      * map.on('speedindexcompleted', function() {
      *   console.log(`speed index is ${map.speedIndexNumber}`);
      * });
